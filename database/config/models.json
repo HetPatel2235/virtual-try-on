@@ -1,0 +1,11 @@
+{
+  "segmentation": {
+    "model_type": "unet",
+    "weights_path": null,
+    "input_size": [512, 512]
+  },
+  "pose": {
+    "model_type": "mediapipe",
+    "confidence_threshold": 0.5
+  }
+}
