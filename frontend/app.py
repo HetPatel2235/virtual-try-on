@@ -618,15 +618,15 @@ elif page == "Try-On":
         temp_path    = st.session_state.temp_path
     else:
         # Create dummy measurements object from profile
-        from ml_ai.core.measurement_inference import BodyMeasurements
-        measurements = BodyMeasurements(
+        from ml_ai.core.models import Measurements
+        measurements = Measurements(
             shoulder_width_cm=user_info.get("shoulder_width_cm", 0.0),
             chest_circumference_cm=user_info.get("chest_circumference_cm", 0.0),
             torso_length_cm=user_info.get("torso_length_cm", 0.0),
+            source="manual",
             user_height_cm=user_info.get("height_cm", 0.0),
             calibration_method="profile",
-            confidence=1.0,
-            warnings=[]
+            confidence=1.0
         )
         temp_path = None
         st.info("💡 Using your saved profile measurements for size recommendations. To see a visual try-on, please upload a photo.")
