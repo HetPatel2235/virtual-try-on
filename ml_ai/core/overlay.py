@@ -92,13 +92,24 @@ def composite_garment_on_person(
         os.makedirs(debug_dir, exist_ok=True)
         cv2.imwrite(f"{debug_dir}/debug_luminance.png", garment_f.clip(0, 255).astype(np.uint8))
 
-    # ── 2. Body Shading Integration (Depth Transfer) ─────────────────
-    gray = cv2.cvtColor(person_image, cv2.COLOR_BGR2GRAY)
-    shading_map = cv2.GaussianBlur(gray, (51, 51), 0).astype(np.float32) / 255.0
-    garment_f = garment_f * (0.85 + 0.15 * shading_map[..., None])
+    # ── 2. High-Frequency Detail Transfer (Wrinkles & Shadows) ─────────
+    gray = cv2.cvtColor(person_image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+    
+    # Low frequency (global lighting)
+    gray_blur = cv2.GaussianBlur(gray, (51, 51), 0)
+    
+    # High frequency (wrinkles, folds, local shadows)
+    # Ratio of original to blurred gives high-frequency details centered around 1.0
+    details = gray / (gray_blur + 1e-5)
+    
+    # Blend: Multiply garment ONLY by high-frequency wrinkles
+    # This preserves the original color of the new garment while transferring wrinkles
+    garment_f = garment_f * details[..., None]
+    garment_f = np.clip(garment_f, 0, 255)
     
     if debug_dir:
-        cv2.imwrite(f"{debug_dir}/debug_shading_map.png", (shading_map * 255).clip(0, 255).astype(np.uint8))
+        cv2.imwrite(f"{debug_dir}/debug_shading_map.png", (gray_blur * 255).clip(0, 255).astype(np.uint8))
+        cv2.imwrite(f"{debug_dir}/debug_details_map.png", (np.clip(details, 0, 2) * 127).astype(np.uint8))
 
     # ── 3. Subtle Wrinkle Simulation (Texture Breakup) ───────────────
     noise = np.random.rand(h // 8, w // 8).astype(np.float32)
@@ -146,11 +157,19 @@ def composite_garment_on_person(
     composite = garment_f * blend_mask_3ch + person_f * (1.0 - blend_mask_3ch)
     
     # ── 6. Arm Occlusion (CRITICAL FINAL STEP) ───────────────────────
+    if debug_dir:
+        cv2.imwrite(f"{debug_dir}/debug_blend_mask.png", (blend_mask * 255).astype(np.uint8))
+        if arm_mask is not None:
+            cv2.imwrite(f"{debug_dir}/debug_arm_mask.png", (arm_mask * 255).astype(np.uint8))
+            
     if arm_mask is not None:
         arm_f = (arm_mask > 0).astype(np.float32)[..., None]
         composite = composite * (1.0 - arm_f) + person_image.astype(np.float32) * arm_f
 
     final = composite.clip(0, 255).astype(np.uint8)
+    
+    # ── 7. Global Drop Shadow ────────────────────────────────────────
+    final = add_garment_shadow(final, garment_mask, shadow_strength=0.35, blur_px=15, offset_xy=(4, 6))
     
     if debug_dir:
         cv2.imwrite(f"{debug_dir}/debug_final_realism.png", final)

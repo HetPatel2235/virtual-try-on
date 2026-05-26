@@ -26,23 +26,23 @@ logger = logging.getLogger(__name__)
 # Fixed prompts (intentionally simple — do NOT overcomplicate)
 # ---------------------------------------------------------------------------
 _POSITIVE_PROMPT = (
-    "a realistic photo of a person wearing a t-shirt, "
+    "a realistic photo of a person wearing {garment_category}, "
     "natural lighting, detailed fabric, realistic folds, "
     "no artifacts, high quality"
 )
 
 _NEGATIVE_PROMPT = (
     "blurry, distorted, extra limbs, unrealistic cloth, "
-    "artifacts, deformed body"
+    "artifacts, deformed body, sketch, cartoon, illustration, drawing"
 )
 
 # ---------------------------------------------------------------------------
 # Diffusion settings
 # ---------------------------------------------------------------------------
-_STRENGTH = 0.30          # low — preserves ~70 % of original pixels
+_STRENGTH = 0.55          # Increased to allow adding actual color/texture
 _GUIDANCE_SCALE = 7.0
 _NUM_STEPS = 25
-_CONTROLNET_SCALE = 0.8   # strong structural guidance
+_CONTROLNET_SCALE = 0.45  # Decreased so Canny doesn't overpower the color
 _CANNY_LOW = 100
 _CANNY_HIGH = 200
 
@@ -70,7 +70,7 @@ class AIRefiner:
     # Public API
     # ------------------------------------------------------------------
 
-    def refine(self, image: np.ndarray) -> np.ndarray:
+    def refine(self, image: np.ndarray, garment_category: str = "t-shirt") -> np.ndarray:
         """
         Refine a Phase 3 composite into a photorealistic image.
 
@@ -78,6 +78,8 @@ class AIRefiner:
         ----------
         image : np.ndarray
             BGR uint8 image (H, W, 3) — the Phase 3 composite.
+        garment_category : str
+            The type of garment being tried on (e.g., "cargo pants", "t-shirt").
 
         Returns
         -------
@@ -90,7 +92,7 @@ class AIRefiner:
             return image
 
         try:
-            return self._run_refinement(image)
+            return self._run_refinement(image, garment_category)
         except Exception as e:
             logger.warning(f"AI refinement failed — falling back to Phase 3: {e}")
             return image
@@ -167,7 +169,7 @@ class AIRefiner:
         self._pipe = pipe
         logger.info("AI refiner pipeline loaded and ready.")
 
-    def _run_refinement(self, image: np.ndarray) -> np.ndarray:
+    def _run_refinement(self, image: np.ndarray, garment_category: str) -> np.ndarray:
         """Core refinement logic — assumes availability already checked."""
         import torch
         from PIL import Image as PILImage
@@ -178,6 +180,9 @@ class AIRefiner:
 
         # ── 1. Convert BGR → RGB PIL ──────────────────────────────────
         input_pil = self._to_pil(image)
+        
+        # ── 1.5. Format prompt ────────────────────────────────────────
+        pos_prompt = _POSITIVE_PROMPT.format(garment_category=garment_category)
 
         # ── 2. Resize to SD-compatible dimensions (multiple of 64) ────
         sd_w = self._round_dim(orig_w)
@@ -195,7 +200,7 @@ class AIRefiner:
 
         with torch.inference_mode():
             result = self._pipe(
-                prompt=_POSITIVE_PROMPT,
+                prompt=pos_prompt,
                 negative_prompt=_NEGATIVE_PROMPT,
                 image=input_resized,
                 control_image=canny_pil,

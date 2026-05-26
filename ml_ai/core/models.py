@@ -48,6 +48,8 @@ class Measurements:
     chest_circumference_cm: float
     torso_length_cm: float
     source: str  # "calibrated", "estimated", or "manual"
+    hip_circumference_cm: float = 0.0
+    inseam_length_cm: float = 0.0
     confidence: float = 0.0
     calibration_method: str = 'none'  # 'height', 'estimated', or 'none'
     user_height_cm: float = 0.0      # user's input height (0 if not provided)

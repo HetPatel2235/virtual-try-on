@@ -84,58 +84,57 @@ def inject_interactive_background():
             constructor() {
                 this.x = Math.random() * width;
                 this.y = Math.random() * height;
-                this.vx = (Math.random() - 0.5) * 1.5;
-                this.vy = (Math.random() - 0.5) * 1.5;
-                this.radius = Math.random() * 2 + 1;
+                // Base movement: slight horizontal drift, constant upward floating
+                this.base_vx = (Math.random() - 0.5) * 0.5;
+                this.base_vy = - (Math.random() * 1.5 + 0.5); 
+                this.vx = this.base_vx;
+                this.vy = this.base_vy;
+                this.radius = Math.random() * 2.5 + 1.0;
             }
             update() {
+                // Antigravity repulsion from mouse
+                let dx = this.x - mouse.x;
+                let dy = this.y - mouse.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < 150) { // repel radius
+                    let force = (150 - dist) / 150;
+                    this.vx += (dx / dist) * force * 1.5;
+                    this.vy += (dy / dist) * force * 1.5;
+                }
+                
+                // Friction / return to normal floating speed
+                this.vx = this.vx * 0.95 + this.base_vx * 0.05;
+                this.vy = this.vy * 0.95 + this.base_vy * 0.05;
+
                 this.x += this.vx;
                 this.y += this.vy;
-                if(this.x < 0 || this.x > width) this.vx = -this.vx;
-                if(this.y < 0 || this.y > height) this.vy = -this.vy;
+
+                // Wrap around edges seamlessly
+                if(this.x < -10) this.x = width + 10;
+                if(this.x > width + 10) this.x = -10;
+                if(this.y < -10) {
+                    this.y = height + 10;
+                    this.x = Math.random() * width; // random x when resetting
+                }
+                if(this.y > height + 10) this.y = -10;
             }
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(31, 119, 180, 0.4)"; 
+                ctx.fillStyle = "rgba(31, 119, 180, 0.6)"; 
                 ctx.fill();
             }
         }
 
-        for(let i=0; i<60; i++) particles.push(new Particle());
+        // Create particles
+        for(let i=0; i<120; i++) particles.push(new Particle());
 
         function animate() {
             ctx.clearRect(0, 0, width, height);
-            
             for(let i=0; i<particles.length; i++) {
                 particles[i].update();
                 particles[i].draw();
-                
-                let dx = particles[i].x - mouse.x;
-                let dy = particles[i].y - mouse.y;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if(dist < 150) {
-                    ctx.beginPath();
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(mouse.x, mouse.y);
-                    ctx.strokeStyle = `rgba(31, 119, 180, ${0.5 * (1 - dist/150)})`;
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
-                
-                for(let j=i+1; j<particles.length; j++) {
-                    let dx2 = particles[i].x - particles[j].x;
-                    let dy2 = particles[i].y - particles[j].y;
-                    let dist2 = Math.sqrt(dx2*dx2 + dy2*dy2);
-                    if(dist2 < 120) {
-                        ctx.beginPath();
-                        ctx.moveTo(particles[i].x, particles[i].y);
-                        ctx.lineTo(particles[j].x, particles[j].y);
-                        ctx.strokeStyle = `rgba(31, 119, 180, ${0.2 * (1 - dist2/120)})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.stroke();
-                    }
-                }
             }
             parentDoc.defaultView.requestAnimationFrame(animate);
         }
@@ -249,8 +248,15 @@ def load_ai_models():
 
 
 @st.cache_resource(show_spinner=False)
-def get_tryon_engine():
+def get_tryon_engine_v8():
     """Load TryOnEngine once per session."""
+    import importlib
+    import ml_ai.core.garment_keypoints
+    importlib.reload(ml_ai.core.garment_keypoints)
+    import ml_ai.core.ai_refiner
+    importlib.reload(ml_ai.core.ai_refiner)
+    import ml_ai.core.tryon_engine
+    importlib.reload(ml_ai.core.tryon_engine)
     from ml_ai.core.tryon_engine import TryOnEngine
     return TryOnEngine()
 
@@ -557,12 +563,15 @@ elif page == "Upload & Measure":
                 st.warning("⚠️ **Estimated** — enter your height for accurate measurements")
 
             st.markdown("#### Body Measurements")
-            col_m1, col_m2 = st.columns(2)
+            col_m1, col_m2, col_m3 = st.columns(3)
             with col_m1:
                 st.metric("Shoulder Width",  f"{measurements.shoulder_width_cm:.1f} cm")
                 st.metric("Torso Length",    f"{measurements.torso_length_cm:.1f} cm")
             with col_m2:
                 st.metric("Chest Circumference", f"{measurements.chest_circumference_cm:.1f} cm")
+                st.metric("Hip Circumference",   f"{measurements.hip_circumference_cm:.1f} cm")
+            with col_m3:
+                st.metric("Inseam Length",       f"{measurements.inseam_length_cm:.1f} cm")
                 st.metric("Confidence",          f"{measurements.confidence * 100:.1f}%")
 
             st.markdown("#### Pose Analysis")
@@ -583,6 +592,8 @@ elif page == "Upload & Measure":
                         "shoulder_width_cm": round(measurements.shoulder_width_cm, 1),
                         "chest_circumference_cm": round(measurements.chest_circumference_cm, 1),
                         "torso_length_cm": round(measurements.torso_length_cm, 1),
+                        "hip_circumference_cm": round(measurements.hip_circumference_cm, 1),
+                        "inseam_length_cm": round(measurements.inseam_length_cm, 1),
                         "height_cm": user_height_cm,
                     }
                     success, msg = update_user_profile(user_info["id"], new_data)
@@ -653,32 +664,69 @@ elif page == "Try-On":
     with col_left:
         st.subheader("🛍️ Select Garment")
 
-        selected_garment = st.selectbox("Choose garment:", garments, key="tryon_garment_select")
+        tab_catalog, tab_custom = st.tabs(["From Catalog", "Upload Custom"])
+        
+        is_custom = False
+        custom_garment_img = None
+        custom_category = "Upper body"
 
-        try:
-            metadata   = load_garment_metadata(selected_garment)
-            size_chart = metadata.get("size_chart", {})
-        except FileNotFoundError:
-            st.error(f"Garment not found: {selected_garment}")
-            st.stop()
+        with tab_catalog:
+            upper_garments = []
+            lower_garments = []
+            for g in garments:
+                try:
+                    cat = load_garment_metadata(g).get("category", "").lower()
+                    if "lower" in cat or "pant" in cat:
+                        lower_garments.append(g)
+                    else:
+                        upper_garments.append(g)
+                except Exception:
+                    upper_garments.append(g)
 
-        # Garment thumbnail
-        try:
-            garment_img = load_garment_image(selected_garment)
-            st.image(bgr_to_pil(garment_img), width=220, caption=metadata.get("name", selected_garment))
-        except Exception:
-            st.caption("(Preview unavailable)")
+            catalog_category = st.radio("Clothing Category", ["Uppers", "Lowers"], horizontal=True)
+            display_garments = lower_garments if catalog_category == "Lowers" else upper_garments
 
-        # Garment details
-        with st.expander("📋 Garment Details", expanded=False):
-            st.write(f"**Name:** {metadata.get('name', 'N/A')}")
-            st.write(f"**Brand:** {metadata.get('brand', 'N/A')}")
-            st.write(f"**Category:** {metadata.get('category', 'N/A')}")
-            st.write(f"**Material:** {metadata.get('material', 'N/A')}")
-            st.write(f"**Price:** ${metadata.get('price_usd', 0):.2f}")
-            colors = metadata.get("available_colors", [])
-            if colors:
-                st.write(f"**Colors:** {', '.join(colors)}")
+            if not display_garments:
+                st.warning(f"No {catalog_category.lower()} available in the catalog.")
+                st.stop()
+
+            selected_garment = st.selectbox("Choose garment:", display_garments, key="tryon_garment_select")
+
+            try:
+                metadata   = load_garment_metadata(selected_garment)
+                size_chart = metadata.get("size_chart", {})
+            except FileNotFoundError:
+                st.error(f"Garment not found: {selected_garment}")
+                st.stop()
+
+            # Garment thumbnail
+            try:
+                catalog_garment_img = load_garment_image(selected_garment)
+                st.image(bgr_to_pil(catalog_garment_img), width=220, caption=metadata.get("name", selected_garment))
+            except Exception:
+                st.caption("(Preview unavailable)")
+
+            # Garment details
+            with st.expander("📋 Garment Details", expanded=False):
+                st.write(f"**Name:** {metadata.get('name', 'N/A')}")
+                st.write(f"**Brand:** {metadata.get('brand', 'N/A')}")
+                st.write(f"**Category:** {metadata.get('category', 'N/A')}")
+                st.write(f"**Material:** {metadata.get('material', 'N/A')}")
+                st.write(f"**Price:** ${metadata.get('price_usd', 0):.2f}")
+                colors = metadata.get("available_colors", [])
+                if colors:
+                    st.write(f"**Colors:** {', '.join(colors)}")
+                    
+        with tab_custom:
+            custom_upload = st.file_uploader("Upload clothing image", type=["jpg", "jpeg", "png"])
+            custom_category = st.selectbox("Clothing Type", ["Upper body", "Lower body", "Dress"])
+            if custom_upload:
+                file_bytes = np.asarray(bytearray(custom_upload.read()), dtype=np.uint8)
+                custom_garment_img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+                st.image(bgr_to_pil(custom_garment_img), width=220, caption="Custom Upload")
+                # Override catalog selection if a file is uploaded in this tab
+                is_custom = True
+
 
         # Size recommendation
         if size_chart:
@@ -706,6 +754,11 @@ elif page == "Try-On":
                     })
                 st.dataframe(size_chart_data, use_container_width=True)
 
+        # Cloud API settings
+        with st.expander("☁️ Cloud Worker Settings", expanded=False):
+            st.markdown("If you hit rate limits, run the `IDM_VTON_Worker.ipynb` notebook in Google Colab and paste the generated `.gradio.live` link here to use your own free GPU!")
+            colab_api_url = st.text_input("Personal API URL:", value="", placeholder="https://xxxx.gradio.live")
+
         # Fit controls
         st.subheader("⚙️ Fit Settings")
         blend_alpha    = st.slider("Garment opacity",  0.5,  1.0,  1.0, 0.01, key="blend_alpha")
@@ -724,20 +777,29 @@ elif page == "Try-On":
         if run_tryon:
             if not has_photo_result:
                 st.error("❌ You must upload a photo on the **Upload & Measure** page before you can visually try on a garment!")
+            elif is_custom and custom_garment_img is None:
+                st.error("❌ Please upload a custom garment first!")
             else:
                 with st.spinner("Warping garment to your body shape…"):
                     try:
                         person_img  = load_image(temp_path)
-                        garment_img = load_garment_image(selected_garment)
-                        category    = metadata.get("category", "tshirt").lower()
-
-                        try:
-                            from ml_ai.core.garment_manager import load_garment_mask
-                            garment_mask_img = load_garment_mask(selected_garment)
-                        except FileNotFoundError:
+                        
+                        if is_custom:
+                            garment_img = custom_garment_img
+                            category = custom_category
                             garment_mask_img = None
+                        else:
+                            garment_img = load_garment_image(selected_garment)
+                            category    = metadata.get("category", "Upper body").lower()
+                            if category in ["lower body", "lower_body"]:
+                                category = "pants"
+                            try:
+                                from ml_ai.core.garment_manager import load_garment_mask
+                                garment_mask_img = load_garment_mask(selected_garment)
+                            except FileNotFoundError:
+                                garment_mask_img = None
 
-                        engine       = get_tryon_engine()
+                        engine       = get_tryon_engine_v8()
                         tryon_result = engine.run(
                             person_image=person_img,
                             garment_image=garment_img,
@@ -746,6 +808,8 @@ elif page == "Try-On":
                             shoulder_scale=shoulder_scale,
                             use_segmentation_mask=True,
                             garment_mask=garment_mask_img,
+                            use_ai_refinement=True,
+                            api_url=colab_api_url,
                         )
 
                         if tryon_result.success and tryon_result.composite_image is not None:

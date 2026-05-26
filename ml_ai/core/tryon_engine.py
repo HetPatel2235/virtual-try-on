@@ -108,7 +108,8 @@ class TryOnEngine:
         shoulder_scale: float = 1.0,
         use_segmentation_mask: bool = True,
         garment_mask: np.ndarray | None = None,
-        use_ai_refinement: bool = True,
+        use_ai_refinement: bool = False,
+        api_url: str = "",
     ) -> TryOnResult:
         """
         Run full virtual try-on pipeline.
@@ -123,6 +124,7 @@ class TryOnEngine:
             use_segmentation_mask:  If True, blend only over torso region
             garment_mask:           Pre-computed binary mask from normalization.
                                     If provided, warped via TPS for accurate compositing.
+            api_url:                Custom Colab API URL, empty to use public HF Space.
 
         Returns:
             TryOnResult with composite image and diagnostics
@@ -137,7 +139,52 @@ class TryOnEngine:
                 composite_image=None, warped_garment=None, garment_mask=None,
                 person_image=person_image, success=False, error=err
             )
-
+            
+        # ── 2. Route to appropriate engine ──────────────────────────────
+        cat_lower = garment_category.lower().strip()
+        is_lower_body = cat_lower in ["lower body", "lower_body", "pants", "skirt", "shorts"]
+        
+        if not is_lower_body:
+            import tempfile
+            from ml_ai.core.cloud_engine import CloudTryOnEngine
+            
+            try:
+                cloud_engine = CloudTryOnEngine(api_url=api_url)
+                
+                # Save numpy arrays to temp files for the Gradio client
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as pt, \
+                     tempfile.NamedTemporaryFile(suffix=".png", delete=False) as gt:
+                    
+                    cv2.imwrite(pt.name, person_image)
+                    cv2.imwrite(gt.name, garment_image)
+                    
+                    logger.info("Offloading to Cloud Engine...")
+                    cloud_res = cloud_engine.run(pt.name, gt.name, garment_category)
+                    
+                if not cloud_res["success"]:
+                    return TryOnResult(
+                        composite_image=None, warped_garment=None, garment_mask=None,
+                        person_image=person_image, success=False, error=cloud_res["error"]
+                    )
+                    
+                return TryOnResult(
+                    composite_image=cloud_res["composite_image"],
+                    warped_garment=cloud_res["composite_image"],  # N/A for cloud
+                    garment_mask=np.zeros_like(person_image[:,:,0]), # N/A
+                    person_image=person_image,
+                    success=True,
+                    warnings=[],
+                    processing_time_s=cloud_res["processing_time_s"]
+                )
+            except Exception as e:
+                return TryOnResult(
+                    composite_image=None, warped_garment=None, garment_mask=None,
+                    person_image=person_image, success=False, error=f"Cloud API failed: {e}"
+                )
+        else:
+            logger.info("Lower body detected: Bypassing Cloud API and using local geometric engine.")
+            
+        # ── Local Engine Fallback / Lower Body Execution ────────
         person_h, person_w = person_image.shape[:2]
 
         # ── 1½. Preprocess person image for real-world photos ────────
@@ -175,11 +222,19 @@ class TryOnEngine:
 
         # ── 4. Resolve TPS control points ───────────────────────────────
         schema = get_garment_schema(garment_category)
+        
+        # ── 6. TPS Warping ──────────────────────────────────────────────
+        person_mask = None
+        if seg_result and "torso" in seg_result.body_parts:
+            person_mask = seg_result.body_parts["torso"]
+        
         src_pts, dst_pts = resolve_points(
             schema, garment_image,
             pose_result.keypoints,
             person_w, person_h,
-            shoulder_scale=shoulder_scale
+            shoulder_scale=shoulder_scale,
+            garment_mask=garment_mask,
+            person_mask=person_mask
         )
 
         if src_pts is None or dst_pts is None:
@@ -222,9 +277,9 @@ class TryOnEngine:
         body_mask = None
         arm_mask = None
         if seg_result is not None:
-            body_mask = _build_upper_body_mask(seg_result)
-            body_mask = _apply_neck_occlusion(body_mask, pose_result)
-            arm_mask = _build_arm_mask(seg_result)
+            body_mask = seg_result.mask
+            # body_mask = _apply_neck_occlusion(body_mask, pose_result)
+            arm_mask = None
 
         try:
             DEBUG_DIR.mkdir(parents=True, exist_ok=True)
@@ -249,12 +304,23 @@ class TryOnEngine:
             pass
 
         if use_ai_refinement:
-            refined = self._ai_refiner.refine(composite)
+            refined = self._ai_refiner.refine(composite, garment_category)
             try:
                 cv2.imwrite(str(DEBUG_DIR / "debug_phase4_refined.png"), refined)
             except Exception:
                 pass
-            composite = refined  # use refined as final output
+            
+            # PERFECT COMPOSITING FIX:
+            # AI Refiner (Stable Diffusion) often desaturates the skin or changes the background.
+            # We ONLY want the AI's enhancements on the garment itself!
+            # We blend the refined image back onto the original Phase 3 composite using the garment mask.
+            mask_f = warped_mask.astype(np.float32)
+            mask_blur = cv2.GaussianBlur(mask_f * 255, (7, 7), 0) / 255.0
+            mask_3d = mask_blur[:, :, np.newaxis]
+            
+            # refined = AI enhanced garment
+            # composite = original person with perfect background and skin tone
+            composite = (refined * mask_3d + composite * (1.0 - mask_3d)).astype(np.uint8)
 
         elapsed = time.perf_counter() - t_start
 
@@ -317,7 +383,7 @@ class TryOnEngine:
             return False, "garment_image must be (H, W, 3) or (H, W, 4)"
 
         # Convert BGRA person to BGR
-        supported = {"tshirt", "shirt", "jacket", "t-shirt", "t_shirt"}
+        supported = {"tshirt", "shirt", "jacket", "t-shirt", "t_shirt", "lower body", "lower_body", "pants", "skirt", "shorts"}
         if garment_category.lower().strip() not in supported:
             return False, f"Unsupported garment category: '{garment_category}'"
         return True, ""

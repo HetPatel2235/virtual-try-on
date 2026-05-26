@@ -12,8 +12,8 @@ How it works:
 
 from typing import Tuple, List
 import numpy as np
-
 from src.models import Measurements, SegmentationResult, PoseResult, Keypoint
+from ml_ai.core.pose_detection import calculate_inseam_length, calculate_hip_width
 
 # Anatomical ratio: flat chest width → chest circumference
 # This is a valid medical approximation (circumference ≈ 2.35× front width)
@@ -49,10 +49,12 @@ def infer_measurements(
     if not pose_result or not seg_result:
         raise ValueError("Both pose and segmentation results required")
 
-    # ── Pixel measurements from keypoints (always real) ──────────────
     shoulder_width_px = pose_result.shoulder_width_px
     torso_length_px = calculate_torso_length(pose_result.keypoints)
     chest_width_px = shoulder_width_px * 1.15  # ribcage slightly wider than shoulders
+    
+    hip_width_px = calculate_hip_width(pose_result.keypoints)
+    inseam_length_px = calculate_inseam_length(pose_result.keypoints)
 
     # ── Calibrate pixels_per_cm ──────────────────────────────────────
     if user_height_cm > 0:
@@ -68,6 +70,9 @@ def infer_measurements(
     shoulder_width_cm = shoulder_width_px / pixels_per_cm
     torso_length_cm = (torso_length_px / pixels_per_cm) * TORSO_MULTIPLIER
     chest_circumference_cm = chest_width_px / pixels_per_cm * SHOULDER_TO_CIRCUMFERENCE
+    
+    hip_circumference_cm = (hip_width_px / pixels_per_cm) * SHOULDER_TO_CIRCUMFERENCE if hip_width_px > 0 else 0.0
+    inseam_length_cm = (inseam_length_px / pixels_per_cm) if inseam_length_px > 0 else 0.0
 
     # ── Confidence ───────────────────────────────────────────────────
     confidence = _calculate_confidence(
@@ -78,6 +83,8 @@ def infer_measurements(
         shoulder_width_cm=round(shoulder_width_cm, 2),
         chest_circumference_cm=round(chest_circumference_cm, 2),
         torso_length_cm=round(torso_length_cm, 2),
+        hip_circumference_cm=round(hip_circumference_cm, 2),
+        inseam_length_cm=round(inseam_length_cm, 2),
         source='calibrated' if calibration_method == 'height' else 'estimated',
         confidence=round(confidence, 2),
         calibration_method=calibration_method,
@@ -338,5 +345,7 @@ def print_measurement_debug_info(pose_result: PoseResult, measurements: Measurem
         print(f"Pixels per cm: {pose_result.shoulder_width_px / measurements.shoulder_width_cm:.2f}")
     print(f"\nChest Circumference (cm): {measurements.chest_circumference_cm:.2f}")
     print(f"Torso Length (cm): {measurements.torso_length_cm:.2f}")
+    print(f"Hip Circumference (cm): {measurements.hip_circumference_cm:.2f}")
+    print(f"Inseam Length (cm): {measurements.inseam_length_cm:.2f}")
     print(f"Confidence: {measurements.confidence * 100:.1f}%")
     print("=" * 70 + "\n")

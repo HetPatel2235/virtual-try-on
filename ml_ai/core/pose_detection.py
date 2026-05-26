@@ -48,8 +48,8 @@ def detect_pose(image: np.ndarray, pose_model=None) -> PoseResult:
     # Validate detection
     if not check_critical_keypoints(pose_result.keypoints):
         raise RuntimeError(
-            "Missing critical keypoints (left_shoulder, right_shoulder, neck). "
-            "Ensure person is facing camera with full body visible."
+            "Missing critical keypoints (shoulders or hips). "
+            "Ensure person is facing camera with torso or lower body visible."
         )
     
     return pose_result
@@ -65,10 +65,11 @@ def check_critical_keypoints(keypoints: List[Keypoint]) -> bool:
     Returns:
         True if critical keypoints present, False otherwise
     """
-    CRITICAL_KEYPOINTS = {'left_shoulder', 'right_shoulder'}
     detected_names = {kp.name for kp in keypoints}
+    has_shoulders = {'left_shoulder', 'right_shoulder'}.issubset(detected_names)
+    has_hips = {'left_hip', 'right_hip'}.issubset(detected_names)
     
-    return CRITICAL_KEYPOINTS.issubset(detected_names)
+    return has_shoulders or has_hips
 
 
 def validate_pose_quality(pose_result: PoseResult) -> tuple:
@@ -115,7 +116,7 @@ def get_keypoint_coordinate(keypoints: List[Keypoint], keypoint_name: str) -> tu
     """
     for kp in keypoints:
         if kp.name == keypoint_name:
-            return (kp.x_pixel, kp.y_pixel)
+            return (kp.x, kp.y)
     
     return (0, 0)
 
@@ -142,10 +143,45 @@ def calculate_torso_length(keypoints: List[Keypoint]) -> float:
         return 0.0
     
     # Calculate average shoulder y and hip y
-    shoulder_y = (left_shoulder.y_pixel + right_shoulder.y_pixel) / 2
-    hip_y = (left_hip.y_pixel + right_hip.y_pixel) / 2
+    shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
+    hip_y = (left_hip.y + right_hip.y) / 2
     
     # Torso length is vertical distance
     torso_length = abs(hip_y - shoulder_y)
     
     return torso_length
+
+
+def calculate_inseam_length(keypoints: List[Keypoint]) -> float:
+    """Calculate inseam length (crotch/hips to ankle) from keypoints."""
+    left_hip = next((kp for kp in keypoints if kp.name == 'left_hip'), None)
+    right_hip = next((kp for kp in keypoints if kp.name == 'right_hip'), None)
+    left_ankle = next((kp for kp in keypoints if kp.name == 'left_ankle'), None)
+    right_ankle = next((kp for kp in keypoints if kp.name == 'right_ankle'), None)
+    
+    if not (left_hip and right_hip):
+        return 0.0
+        
+    hip_y = (left_hip.y + right_hip.y) / 2
+    
+    if left_ankle and right_ankle:
+        ankle_y = (left_ankle.y + right_ankle.y) / 2
+    elif left_ankle:
+        ankle_y = left_ankle.y
+    elif right_ankle:
+        ankle_y = right_ankle.y
+    else:
+        return 0.0
+        
+    return abs(ankle_y - hip_y)
+
+
+def calculate_hip_width(keypoints: List[Keypoint]) -> float:
+    """Calculate hip width from keypoints."""
+    left_hip = next((kp for kp in keypoints if kp.name == 'left_hip'), None)
+    right_hip = next((kp for kp in keypoints if kp.name == 'right_hip'), None)
+    
+    if not (left_hip and right_hip):
+        return 0.0
+        
+    return abs(right_hip.x - left_hip.x)
