@@ -328,36 +328,6 @@ def _derive_all_landmarks(
     d["right_hem_ref"] = (rx, hip_y)
     d["center_hem"]    = (MX, hip_y + SW * 0.05)
 
-    # ── Lower Body Specific (Knees & Ankles) ─────────────────────────
-    if vl_k: d["left_knee"] = vl_k
-    else: d["left_knee"] = (vl_h[0] if vl_h else lx, hip_y + SW * 1.2)
-    
-    if vr_k: d["right_knee"] = vr_k
-    else: d["right_knee"] = (vr_h[0] if vr_h else rx, hip_y + SW * 1.2)
-    
-    if vl_a: d["left_ankle"] = vl_a
-    else: d["left_ankle"] = (vl_h[0] if vl_h else lx, hip_y + SW * 2.5)
-
-    if vr_a: d["right_ankle"] = vr_a
-    else: d["right_ankle"] = (vr_h[0] if vr_h else rx, hip_y + SW * 2.5)
-
-    # Compute inner and outer points for legs to give pants physical width!
-    # A pant leg is roughly 25% of shoulder width at knee, 20% at ankle.
-    kw = SW * 0.13  # half-width at knee
-    aw = SW * 0.11  # half-width at ankle
-    
-    # Left Leg (Viewer-Left)
-    d["left_knee_inner_dst"] = (d["left_knee"][0] + kw, d["left_knee"][1])
-    d["left_knee_outer_dst"] = (d["left_knee"][0] - kw, d["left_knee"][1])
-    d["left_ankle_inner_dst"] = (d["left_ankle"][0] + aw, d["left_ankle"][1])
-    d["left_ankle_outer_dst"] = (d["left_ankle"][0] - aw, d["left_ankle"][1])
-    
-    # Right Leg (Viewer-Right)
-    d["right_knee_inner_dst"] = (d["right_knee"][0] - kw, d["right_knee"][1])
-    d["right_knee_outer_dst"] = (d["right_knee"][0] + kw, d["right_knee"][1])
-    d["right_ankle_inner_dst"] = (d["right_ankle"][0] - aw, d["right_ankle"][1])
-    d["right_ankle_outer_dst"] = (d["right_ankle"][0] + aw, d["right_ankle"][1])
-    
     return d
 
 
@@ -491,37 +461,6 @@ JACKET_SCHEMA = GarmentKeypointSchema(
     ]
 )
 
-LOWER_BODY_SCHEMA = GarmentKeypointSchema(
-    category="lower_body",
-    anchors=[
-        # Waist
-        GarmentAnchor("waist_left",       (0.20, 0.05), "left_side_waist", weight=3),
-        GarmentAnchor("waist_right",      (0.80, 0.05), "right_side_waist", weight=3),
-        GarmentAnchor("waist_center",     (0.50, 0.08), "center_hem", weight=3),
-        
-        # Hips (Structural width)
-        GarmentAnchor("hip_left",         (0.15, 0.15), "left_hem_ref", weight=3),
-        GarmentAnchor("hip_right",        (0.85, 0.15), "right_hem_ref", weight=3),
-        
-        # Knees
-        GarmentAnchor("left_knee_inner",  (0.40, 0.50), "left_knee_inner", weight=2),
-        GarmentAnchor("left_knee_outer",  (0.10, 0.50), "left_knee_outer", weight=2),
-        GarmentAnchor("right_knee_inner", (0.60, 0.50), "right_knee_inner", weight=2),
-        GarmentAnchor("right_knee_outer", (0.90, 0.50), "right_knee_outer", weight=2),
-        
-        # Ankles / Hem
-        GarmentAnchor("left_ankle_inner", (0.40, 0.95), "left_ankle_inner", weight=2),
-        GarmentAnchor("left_ankle_outer", (0.10, 0.95), "left_ankle_outer", weight=2),
-        GarmentAnchor("right_ankle_inner",(0.60, 0.95), "right_ankle_inner", weight=2),
-        GarmentAnchor("right_ankle_outer",(0.90, 0.95), "right_ankle_outer", weight=2),
-    ]
-)
-
-
-# ---------------------------------------------------------------------------
-# Registry and public API
-# ---------------------------------------------------------------------------
-
 _SCHEMA_REGISTRY: Dict[str, GarmentKeypointSchema] = {
     "tshirt":  TSHIRT_SCHEMA,
     "shirt":   SHIRT_SCHEMA,
@@ -529,11 +468,6 @@ _SCHEMA_REGISTRY: Dict[str, GarmentKeypointSchema] = {
     "t-shirt": TSHIRT_SCHEMA,
     "t_shirt": TSHIRT_SCHEMA,
     "tops":    TSHIRT_SCHEMA,
-    "lower body": LOWER_BODY_SCHEMA,
-    "lower_body": LOWER_BODY_SCHEMA,
-    "pants":   LOWER_BODY_SCHEMA,
-    "skirt":   LOWER_BODY_SCHEMA,
-    "shorts":  LOWER_BODY_SCHEMA,
 }
 
 
@@ -542,13 +476,14 @@ def get_garment_schema(category: str) -> GarmentKeypointSchema:
     if key not in _SCHEMA_REGISTRY:
         raise ValueError(
             f"Unknown garment category: '{category}'. "
-            f"Supported: {list_supported_categories()}"
+            f"Supported: {get_supported_categories()}"
         )
     return _SCHEMA_REGISTRY[key]
 
 
-def list_supported_categories() -> List[str]:
-    return ["tshirt", "shirt", "jacket", "lower_body", "pants", "skirt"]
+def get_supported_categories() -> List[str]:
+    """Return a list of valid garment categories."""
+    return ["tshirt", "shirt", "jacket"]
 
 
 def resolve_points(

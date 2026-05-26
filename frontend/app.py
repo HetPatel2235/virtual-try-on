@@ -791,8 +791,6 @@ elif page == "Try-On":
                         else:
                             garment_img = load_garment_image(selected_garment)
                             category    = metadata.get("category", "Upper body").lower()
-                            if category in ["lower body", "lower_body"]:
-                                category = "pants"
                             try:
                                 from ml_ai.core.garment_manager import load_garment_mask
                                 garment_mask_img = load_garment_mask(selected_garment)

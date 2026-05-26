@@ -141,50 +141,44 @@ class TryOnEngine:
             )
             
         # ── 2. Route to appropriate engine ──────────────────────────────
-        cat_lower = garment_category.lower().strip()
-        is_lower_body = cat_lower in ["lower body", "lower_body", "pants", "skirt", "shorts"]
-        
-        if not is_lower_body:
-            import tempfile
-            from ml_ai.core.cloud_engine import CloudTryOnEngine
+        import tempfile
+        from ml_ai.core.cloud_engine import CloudTryOnEngine
             
-            try:
-                cloud_engine = CloudTryOnEngine(api_url=api_url)
+        try:
+            cloud_engine = CloudTryOnEngine(api_url=api_url)
+            
+            # Save numpy arrays to temp files for the Gradio client
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as pt, \
+                 tempfile.NamedTemporaryFile(suffix=".png", delete=False) as gt:
                 
-                # Save numpy arrays to temp files for the Gradio client
-                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as pt, \
-                     tempfile.NamedTemporaryFile(suffix=".png", delete=False) as gt:
-                    
-                    cv2.imwrite(pt.name, person_image)
-                    cv2.imwrite(gt.name, garment_image)
-                    
-                    logger.info("Offloading to Cloud Engine...")
-                    cloud_res = cloud_engine.run(pt.name, gt.name, garment_category)
-                    
-                if not cloud_res["success"]:
-                    return TryOnResult(
-                        composite_image=None, warped_garment=None, garment_mask=None,
-                        person_image=person_image, success=False, error=cloud_res["error"]
-                    )
-                    
-                return TryOnResult(
-                    composite_image=cloud_res["composite_image"],
-                    warped_garment=cloud_res["composite_image"],  # N/A for cloud
-                    garment_mask=np.zeros_like(person_image[:,:,0]), # N/A
-                    person_image=person_image,
-                    success=True,
-                    warnings=[],
-                    processing_time_s=cloud_res["processing_time_s"]
-                )
-            except Exception as e:
+                cv2.imwrite(pt.name, person_image)
+                cv2.imwrite(gt.name, garment_image)
+                
+                logger.info("Offloading to Cloud Engine...")
+                cloud_res = cloud_engine.run(pt.name, gt.name, garment_category)
+                
+            if not cloud_res["success"]:
                 return TryOnResult(
                     composite_image=None, warped_garment=None, garment_mask=None,
-                    person_image=person_image, success=False, error=f"Cloud API failed: {e}"
+                    person_image=person_image, success=False, error=cloud_res["error"]
                 )
-        else:
-            logger.info("Lower body detected: Bypassing Cloud API and using local geometric engine.")
+                
+            return TryOnResult(
+                composite_image=cloud_res["composite_image"],
+                warped_garment=cloud_res["composite_image"],  # N/A for cloud
+                garment_mask=np.zeros_like(person_image[:,:,0]), # N/A
+                person_image=person_image,
+                success=True,
+                warnings=[],
+                processing_time_s=cloud_res["processing_time_s"]
+            )
+        except Exception as e:
+            return TryOnResult(
+                composite_image=None, warped_garment=None, garment_mask=None,
+                person_image=person_image, success=False, error=f"Cloud API failed: {e}"
+            )
             
-        # ── Local Engine Fallback / Lower Body Execution ────────
+        # ── Local Engine Fallback ────────
         person_h, person_w = person_image.shape[:2]
 
         # ── 1½. Preprocess person image for real-world photos ────────
@@ -383,7 +377,7 @@ class TryOnEngine:
             return False, "garment_image must be (H, W, 3) or (H, W, 4)"
 
         # Convert BGRA person to BGR
-        supported = {"tshirt", "shirt", "jacket", "t-shirt", "t_shirt", "lower body", "lower_body", "pants", "skirt", "shorts"}
+        supported = {"tshirt", "shirt", "jacket", "t-shirt", "t_shirt", "tops"}
         if garment_category.lower().strip() not in supported:
             return False, f"Unsupported garment category: '{garment_category}'"
         return True, ""
