@@ -12,9 +12,10 @@ from pathlib import Path
 from typing import Any, MutableMapping
 
 AUTH_DB_PATH = Path("database/data/auth/users.db")
+AUTH_COOKIE_NAME = "vton_auth"
 PASSWORD_HASH_ITERATIONS = 200_000
-SESSION_IDLE_TIMEOUT = timedelta(minutes=30)
-SESSION_MAX_AGE = timedelta(hours=12)
+SESSION_IDLE_TIMEOUT = timedelta(hours=24)
+SESSION_MAX_AGE = timedelta(days=7)
 LOGIN_LOCKOUT_THRESHOLD = 5
 LOGIN_LOCKOUT_MINUTES = 15
 RESET_TOKEN_TTL = timedelta(minutes=15)
@@ -76,6 +77,16 @@ def init_auth_db() -> None:
             """
         )
         _ensure_users_columns(conn)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
         conn.commit()
 
 
@@ -218,9 +229,13 @@ def authenticate_user(login_id: str, password: str) -> tuple[bool, str, dict[str
         )
         conn.commit()
 
-    return True, "Login successful.", {
-        "id": user["id"], 
-        "username": user["username"], 
+    return True, "Login successful.", _row_to_user_dict(user)
+
+
+def _row_to_user_dict(user: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": user["id"],
+        "username": user["username"],
         "email": user["email"],
         "shoulder_width_cm": user["shoulder_width_cm"],
         "chest_circumference_cm": user["chest_circumference_cm"],
@@ -231,6 +246,76 @@ def authenticate_user(login_id: str, password: str) -> tuple[bool, str, dict[str
         "phone_number": user["phone_number"],
         "profile_picture_path": user["profile_picture_path"],
     }
+
+
+def _user_select_sql() -> str:
+    return """
+        SELECT id, username, email, password_salt, password_hash,
+               failed_login_attempts, lockout_until_utc,
+               shoulder_width_cm, chest_circumference_cm, torso_length_cm, height_cm,
+               gender, date_of_birth, phone_number, profile_picture_path
+        FROM users
+    """
+
+
+def get_user_by_id(user_id: int) -> dict[str, Any] | None:
+    """Load user profile for session restore."""
+    with get_db_connection() as conn:
+        user = conn.execute(
+            f"{_user_select_sql()} WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    if user is None:
+        return None
+    return _row_to_user_dict(user)
+
+
+def _hash_session_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_persistent_token(user_id: int) -> str:
+    """Create a browser-persisted login token (survives page refresh)."""
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_session_token(token)
+    with get_db_connection() as conn:
+        conn.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+        conn.execute(
+            """
+            INSERT INTO auth_sessions (token_hash, user_id, created_at_utc)
+            VALUES (?, ?, ?)
+            """,
+            (token_hash, user_id, utc_now().isoformat()),
+        )
+        conn.commit()
+    return token
+
+
+def validate_persistent_token(token: str) -> dict[str, Any] | None:
+    """Validate saved login token and return user profile."""
+    clean = token.strip()
+    if not clean:
+        return None
+    token_hash = _hash_session_token(clean)
+    with get_db_connection() as conn:
+        row = conn.execute(
+            "SELECT user_id FROM auth_sessions WHERE token_hash = ?",
+            (token_hash,),
+        ).fetchone()
+    if row is None:
+        return None
+    return get_user_by_id(int(row["user_id"]))
+
+
+def revoke_persistent_token(token: str) -> None:
+    """Remove a saved login token (logout)."""
+    clean = token.strip()
+    if not clean:
+        return
+    token_hash = _hash_session_token(clean)
+    with get_db_connection() as conn:
+        conn.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (token_hash,))
+        conn.commit()
 
 
 def request_password_reset(login_id: str) -> tuple[bool, str, str | None]:
@@ -358,25 +443,42 @@ def initialize_auth_session(session_state: MutableMapping[str, Any]) -> None:
     session_state.setdefault("auth_user", None)
     session_state.setdefault("auth_started_at", None)
     session_state.setdefault("auth_last_seen_at", None)
+    session_state.setdefault("auth_token", None)
 
 
-def login_session(session_state: MutableMapping[str, Any], user: dict[str, Any]) -> None:
-    """Set auth session fields after login."""
+def login_session(
+    session_state: MutableMapping[str, Any],
+    user: dict[str, Any],
+    existing_token: str | None = None,
+) -> str:
+    """Set auth session fields after login. Returns token stored in the browser."""
     now = utc_now().isoformat()
     session_state["authenticated"] = True
     session_state["auth_user"] = user
     session_state["auth_started_at"] = now
     session_state["auth_last_seen_at"] = now
+    token = existing_token or create_persistent_token(int(user["id"]))
+    session_state["auth_token"] = token
+    return token
 
 
-def logout_session(session_state: MutableMapping[str, Any]) -> None:
+def logout_session(
+    session_state: MutableMapping[str, Any],
+    revoke_token: bool = True,
+) -> None:
     """Clear authentication session."""
+    if revoke_token:
+        token = session_state.get("auth_token")
+        if token:
+            revoke_persistent_token(str(token))
     session_state["authenticated"] = False
     session_state["auth_user"] = None
     session_state["auth_started_at"] = None
     session_state["auth_last_seen_at"] = None
+    session_state["auth_token"] = None
     session_state.pop("result", None)
     session_state.pop("temp_path", None)
+    session_state.pop("_auth_bootstrap", None)
 
 
 def is_session_valid(session_state: MutableMapping[str, Any]) -> bool:

@@ -73,6 +73,36 @@ def calculate_fit_score(
         weight = 0.15
         total_score += torso_score * weight
         total_weight += weight
+
+    if 'waist_circumference_cm' in size_measurements and user_measurements.hip_circumference_cm > 0:
+        waist_score = calculate_measurement_fit(
+            user_measurements.hip_circumference_cm,
+            size_measurements['waist_circumference_cm'],
+            tolerance_percent=6
+        )
+        weight = 0.45
+        total_score += waist_score * weight
+        total_weight += weight
+
+    if 'hip_circumference_cm' in size_measurements and user_measurements.hip_circumference_cm > 0:
+        hip_score = calculate_measurement_fit(
+            user_measurements.hip_circumference_cm,
+            size_measurements['hip_circumference_cm'],
+            tolerance_percent=6
+        )
+        weight = 0.35
+        total_score += hip_score * weight
+        total_weight += weight
+
+    if 'inseam_length_cm' in size_measurements and user_measurements.inseam_length_cm > 0:
+        inseam_score = calculate_measurement_fit(
+            user_measurements.inseam_length_cm,
+            size_measurements['inseam_length_cm'],
+            tolerance_percent=5
+        )
+        weight = 0.20
+        total_score += inseam_score * weight
+        total_weight += weight
     
     if total_weight == 0:
         return 0.0

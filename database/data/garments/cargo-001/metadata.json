@@ -1,0 +1,72 @@
+{
+  "id": "cargo-001",
+  "name": "Utility Cargo Pants",
+  "category": "cargo pants",
+  "brand": "FieldWear",
+  "description": "Relaxed fit cargo pants with side pockets",
+  "material": "100% Cotton Twill",
+  "price_usd": 59.99,
+  "available_colors": [
+    "olive",
+    "khaki",
+    "black"
+  ],
+  "image_filename": "image.png",
+  "size_chart": {
+    "28": {
+      "waist_circumference_cm": 71.0,
+      "hip_circumference_cm": 88.0,
+      "inseam_length_cm": 76.0
+    },
+    "30": {
+      "waist_circumference_cm": 76.0,
+      "hip_circumference_cm": 93.0,
+      "inseam_length_cm": 78.0
+    },
+    "32": {
+      "waist_circumference_cm": 81.0,
+      "hip_circumference_cm": 98.0,
+      "inseam_length_cm": 80.0
+    },
+    "34": {
+      "waist_circumference_cm": 86.0,
+      "hip_circumference_cm": 103.0,
+      "inseam_length_cm": 81.0
+    },
+    "36": {
+      "waist_circumference_cm": 91.0,
+      "hip_circumference_cm": 108.0,
+      "inseam_length_cm": 82.0
+    }
+  },
+  "anchor_points": {
+    "waist_left": [
+      0.28,
+      0.12
+    ],
+    "waist_right": [
+      0.72,
+      0.12
+    ],
+    "crotch": [
+      0.5,
+      0.38
+    ],
+    "left_knee": [
+      0.3,
+      0.62
+    ],
+    "right_knee": [
+      0.7,
+      0.62
+    ],
+    "left_hem": [
+      0.28,
+      0.92
+    ],
+    "right_hem": [
+      0.72,
+      0.92
+    ]
+  }
+}

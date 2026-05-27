@@ -106,6 +106,90 @@ GARMENT_DEFINITIONS = {
         }
     },
 
+    "jeans": {
+        "id":          "jeans-001",
+        "name":        "Classic Slim Jeans",
+        "category":    "jeans",
+        "brand":       "DenimCo",
+        "description": "Mid-rise slim fit denim jeans",
+        "material":    "98% Cotton, 2% Elastane",
+        "price_usd":   49.99,
+        "available_colors": ["indigo", "black", "light wash"],
+        "image_filename": "image.png",
+        "size_chart": {
+            "28": {"waist_circumference_cm": 71.0, "hip_circumference_cm": 88.0, "inseam_length_cm": 76.0},
+            "30": {"waist_circumference_cm": 76.0, "hip_circumference_cm": 93.0, "inseam_length_cm": 78.0},
+            "32": {"waist_circumference_cm": 81.0, "hip_circumference_cm": 98.0, "inseam_length_cm": 80.0},
+            "34": {"waist_circumference_cm": 86.0, "hip_circumference_cm": 103.0, "inseam_length_cm": 81.0},
+            "36": {"waist_circumference_cm": 91.0, "hip_circumference_cm": 108.0, "inseam_length_cm": 82.0},
+        },
+        "anchor_points": {
+            "waist_left":   [0.28, 0.12],
+            "waist_right":  [0.72, 0.12],
+            "crotch":       [0.50, 0.38],
+            "left_knee":    [0.30, 0.62],
+            "right_knee":   [0.70, 0.62],
+            "left_hem":     [0.28, 0.92],
+            "right_hem":    [0.72, 0.92],
+        }
+    },
+
+    "cargo": {
+        "id":          "cargo-001",
+        "name":        "Utility Cargo Pants",
+        "category":    "cargo pants",
+        "brand":       "FieldWear",
+        "description": "Relaxed fit cargo pants with side pockets",
+        "material":    "100% Cotton Twill",
+        "price_usd":   59.99,
+        "available_colors": ["olive", "khaki", "black"],
+        "image_filename": "image.png",
+        "size_chart": {
+            "28": {"waist_circumference_cm": 71.0, "hip_circumference_cm": 90.0, "inseam_length_cm": 76.0},
+            "30": {"waist_circumference_cm": 76.0, "hip_circumference_cm": 95.0, "inseam_length_cm": 78.0},
+            "32": {"waist_circumference_cm": 81.0, "hip_circumference_cm": 100.0, "inseam_length_cm": 80.0},
+            "34": {"waist_circumference_cm": 86.0, "hip_circumference_cm": 105.0, "inseam_length_cm": 81.0},
+            "36": {"waist_circumference_cm": 91.0, "hip_circumference_cm": 110.0, "inseam_length_cm": 82.0},
+        },
+        "anchor_points": {
+            "waist_left":   [0.28, 0.12],
+            "waist_right":  [0.72, 0.12],
+            "crotch":       [0.50, 0.38],
+            "left_knee":    [0.30, 0.62],
+            "right_knee":   [0.70, 0.62],
+            "left_hem":     [0.28, 0.92],
+            "right_hem":    [0.72, 0.92],
+        }
+    },
+
+    "chinos": {
+        "id":          "chinos-001",
+        "name":        "Smart Chinos",
+        "category":    "chinos",
+        "brand":       "FormalEdge",
+        "description": "Tapered fit chino trousers",
+        "material":    "97% Cotton, 3% Spandex",
+        "price_usd":   44.99,
+        "available_colors": ["navy", "stone", "charcoal"],
+        "image_filename": "image.png",
+        "size_chart": {
+            "28": {"waist_circumference_cm": 71.0, "hip_circumference_cm": 88.0, "inseam_length_cm": 76.0},
+            "30": {"waist_circumference_cm": 76.0, "hip_circumference_cm": 93.0, "inseam_length_cm": 78.0},
+            "32": {"waist_circumference_cm": 81.0, "hip_circumference_cm": 98.0, "inseam_length_cm": 80.0},
+            "34": {"waist_circumference_cm": 86.0, "hip_circumference_cm": 103.0, "inseam_length_cm": 81.0},
+            "36": {"waist_circumference_cm": 91.0, "hip_circumference_cm": 108.0, "inseam_length_cm": 82.0},
+        },
+        "anchor_points": {
+            "waist_left":   [0.28, 0.12],
+            "waist_right":  [0.72, 0.12],
+            "crotch":       [0.50, 0.38],
+            "left_knee":    [0.30, 0.62],
+            "right_knee":   [0.70, 0.62],
+            "left_hem":     [0.28, 0.92],
+            "right_hem":    [0.72, 0.92],
+        }
+    },
+
     "jacket": {
         "id":          "jacket-001",
         "name":        "Men's Casual Jacket",

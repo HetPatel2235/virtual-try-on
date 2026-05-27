@@ -110,6 +110,7 @@ class TryOnEngine:
         garment_mask: np.ndarray | None = None,
         use_ai_refinement: bool = False,
         api_url: str = "",
+        garment_name: str = "",
     ) -> TryOnResult:
         """
         Run full virtual try-on pipeline.
@@ -140,45 +141,148 @@ class TryOnEngine:
                 person_image=person_image, success=False, error=err
             )
             
-        # ── 2. Route to appropriate engine ──────────────────────────────
+        from ml_ai.core.garment_categories import is_lower_body_category
+
+        # Lower body: local warp (fast, visible). Cloud HF space is unreliable for pants.
+        if is_lower_body_category(garment_category):
+            return self._run_lower_body(
+                person_image, garment_image, blend_alpha, garment_name, api_url, t_start
+            )
+
+        # Upper body / dress: cloud AI first, local TPS if cloud fails
+        cloud_result = self._try_cloud(
+            person_image, garment_image, garment_category, garment_name, api_url
+        )
+        if cloud_result is not None:
+            cloud_result.processing_time_s = round(time.perf_counter() - t_start, 3)
+            return cloud_result
+
+        warnings.append("Cloud try-on unavailable — using local garment warp.")
+        return self._run_local_upper(
+            person_image, garment_image, garment_category, blend_alpha, shoulder_scale,
+            use_segmentation_mask, garment_mask, use_ai_refinement, warnings, t_start
+        )
+
+    def _try_cloud(
+        self,
+        person_image: np.ndarray,
+        garment_image: np.ndarray,
+        garment_category: str,
+        garment_name: str,
+        api_url: str,
+    ) -> TryOnResult | None:
+        """Return TryOnResult on cloud success, None to fall back to local."""
         import tempfile
         from ml_ai.core.cloud_engine import CloudTryOnEngine
-            
+        from ml_ai.core.image_io import prepare_image_for_api
+
         try:
             cloud_engine = CloudTryOnEngine(api_url=api_url)
-            
-            # Save numpy arrays to temp files for the Gradio client
+            person_bgr = prepare_image_for_api(person_image)
+            garment_bgr = prepare_image_for_api(garment_image)
+
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as pt, \
                  tempfile.NamedTemporaryFile(suffix=".png", delete=False) as gt:
-                
-                cv2.imwrite(pt.name, person_image)
-                cv2.imwrite(gt.name, garment_image)
-                
-                logger.info("Offloading to Cloud Engine...")
-                cloud_res = cloud_engine.run(pt.name, gt.name, garment_category)
-                
-            if not cloud_res["success"]:
-                return TryOnResult(
-                    composite_image=None, warped_garment=None, garment_mask=None,
-                    person_image=person_image, success=False, error=cloud_res["error"]
+                cv2.imwrite(pt.name, person_bgr)
+                cv2.imwrite(gt.name, garment_bgr)
+                cloud_res = cloud_engine.run(
+                    pt.name, gt.name, garment_category, garment_name=garment_name
                 )
-                
+
+            if not cloud_res["success"]:
+                logger.warning("Cloud try-on failed: %s", cloud_res.get("error"))
+                return None
+
             return TryOnResult(
                 composite_image=cloud_res["composite_image"],
-                warped_garment=cloud_res["composite_image"],  # N/A for cloud
-                garment_mask=np.zeros_like(person_image[:,:,0]), # N/A
+                warped_garment=cloud_res["composite_image"],
+                garment_mask=np.zeros_like(person_image[:, :, 0]),
                 person_image=person_image,
                 success=True,
-                warnings=[],
-                processing_time_s=cloud_res["processing_time_s"]
+                warnings=cloud_res.get("warnings", []),
+                processing_time_s=cloud_res["processing_time_s"],
+            )
+        except Exception as e:
+            logger.warning("Cloud try-on error: %s", e)
+            return None
+
+    def _run_lower_body(
+        self,
+        person_image: np.ndarray,
+        garment_image: np.ndarray,
+        blend_alpha: float,
+        garment_name: str,
+        api_url: str,
+        t_start: float,
+    ) -> TryOnResult:
+        """Pose-based local compositor for pants/jeans — always shows a visible change."""
+        from ml_ai.core.lower_body_composite import composite_lower_body
+
+        warnings: List[str] = []
+        try:
+            person_image, info = preprocess_for_tryon(person_image)
+            if info.steps_applied:
+                warnings.append(f"Image preprocessed: {', '.join(info.steps_applied)}")
+        except Exception as e:
+            warnings.append(f"Preprocessing skipped: {e}")
+
+        try:
+            pose_result = self._detect_pose(person_image)
+        except RuntimeError as e:
+            return TryOnResult(
+                composite_image=None, warped_garment=None, garment_mask=None,
+                person_image=person_image, success=False,
+                error=f"Pose detection failed: {e}. Use a full-body photo with legs visible.",
+            )
+
+        try:
+            composite, warped, mask = composite_lower_body(
+                person_image, garment_image, pose_result.keypoints, blend_alpha
             )
         except Exception as e:
             return TryOnResult(
                 composite_image=None, warped_garment=None, garment_mask=None,
-                person_image=person_image, success=False, error=f"Cloud API failed: {e}"
+                person_image=person_image, success=False,
+                error=f"Lower-body compositing failed: {e}",
             )
-            
-        # ── Local Engine Fallback ────────
+
+        warnings.append(
+            "Pants placed using local warp (instant). For AI realism on legs, "
+            "use a Colab GPU link in Cloud Worker Settings."
+        )
+
+        try:
+            DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(DEBUG_DIR / "debug_composite.png"), composite)
+            cv2.imwrite(str(DEBUG_DIR / "debug_warped_garment.png"), warped)
+            cv2.imwrite(str(DEBUG_DIR / "debug_warped_mask.png"), mask)
+        except Exception:
+            pass
+
+        elapsed = time.perf_counter() - t_start
+        return TryOnResult(
+            composite_image=composite,
+            warped_garment=warped,
+            garment_mask=(mask > 127).astype(np.uint8),
+            person_image=person_image,
+            warnings=warnings,
+            processing_time_s=round(elapsed, 3),
+            success=True,
+        )
+
+    def _run_local_upper(
+        self,
+        person_image: np.ndarray,
+        garment_image: np.ndarray,
+        garment_category: str,
+        blend_alpha: float,
+        shoulder_scale: float,
+        use_segmentation_mask: bool,
+        garment_mask: np.ndarray | None,
+        use_ai_refinement: bool,
+        warnings: List[str],
+        t_start: float,
+    ) -> TryOnResult:
         person_h, person_w = person_image.shape[:2]
 
         # ── 1½. Preprocess person image for real-world photos ────────
@@ -318,15 +422,12 @@ class TryOnEngine:
 
         elapsed = time.perf_counter() - t_start
 
-        # ── 8. Save debug outputs ─────────────────────────────────────
         try:
             DEBUG_DIR.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(DEBUG_DIR / "debug_warped_garment.png"), warped_garment)
-            # Warped mask: scale 0/1 → 0/255 for visibility
             cv2.imwrite(str(DEBUG_DIR / "debug_warped_mask.png"), warped_mask * 255)
             cv2.imwrite(str(DEBUG_DIR / "debug_composite.png"), composite)
             cv2.imwrite(str(DEBUG_DIR / "debug_person.png"), person_image)
-            logger.info(f"Debug images saved to {DEBUG_DIR}")
         except Exception as e:
             logger.warning(f"Failed to save debug images: {e}")
 
@@ -337,7 +438,7 @@ class TryOnEngine:
             person_image=person_image,
             warnings=warnings,
             processing_time_s=round(elapsed, 3),
-            success=True
+            success=True,
         )
 
     def release(self) -> None:
@@ -376,10 +477,13 @@ class TryOnEngine:
         if len(garment_image.shape) != 3 or garment_image.shape[2] not in (3, 4):
             return False, "garment_image must be (H, W, 3) or (H, W, 4)"
 
-        # Convert BGRA person to BGR
-        supported = {"tshirt", "shirt", "jacket", "t-shirt", "t_shirt", "tops"}
-        if garment_category.lower().strip() not in supported:
-            return False, f"Unsupported garment category: '{garment_category}'"
+        from ml_ai.core.garment_categories import is_valid_tryon_category
+
+        if not is_valid_tryon_category(garment_category):
+            return False, (
+                f"Unsupported garment category: '{garment_category}'. "
+                "Use upper body (shirt, jacket), lower body (pants, jeans, cargos), or dress."
+            )
         return True, ""
 
 

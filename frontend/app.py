@@ -19,12 +19,17 @@ from frontend.auth import (
     init_auth_db,
     initialize_auth_session,
     is_session_valid,
-    login_session,
-    logout_session,
     request_password_reset,
     reset_password_with_token,
     update_user_profile,
 )
+from frontend.auth_browser import (
+    bootstrap_auth_from_browser,
+    get_cookie_manager,
+    persist_login,
+    persist_logout,
+)
+from ml_ai.core.garment_categories import catalog_is_lower
 from ml_ai.core.garment_manager import list_available_garments, load_garment_image, load_garment_metadata
 from ml_ai.core.image_utils import load_image
 from ml_ai.core.measurement_inference import infer_measurements, validate_measurements
@@ -186,7 +191,7 @@ def render_auth_page() -> None:
         if login_submit:
             success, message, user = authenticate_user(login_id, password)
             if success and user is not None:
-                login_session(st.session_state, user)
+                persist_login(st.session_state, user)
                 st.success("Login successful.")
                 st.rerun()
             else:
@@ -327,6 +332,8 @@ def process_user_image(image_path, user_height_cm: float = 0.0):
 
 init_auth_db()
 initialize_auth_session(st.session_state)
+_auth_cookies = get_cookie_manager()
+bootstrap_auth_from_browser(st.session_state, _auth_cookies)
 session_valid = is_session_valid(st.session_state)
 
 st.sidebar.markdown("# Virtual Try-On System")
@@ -344,7 +351,7 @@ if session_valid:
             
     st.sidebar.success(f"Logged in as {user_info.get('username', 'user')}")
     if st.sidebar.button("Logout"):
-        logout_session(st.session_state)
+        persist_logout(st.session_state, _auth_cookies)
         st.rerun()
 
     if "current_page" not in st.session_state:
@@ -669,63 +676,84 @@ elif page == "Try-On":
         is_custom = False
         custom_garment_img = None
         custom_category = "Upper body"
+        metadata = {}
+        size_chart = {}
+        selected_garment = garments[0]
+
+        upper_garments = []
+        lower_garments = []
+        for g in garments:
+            try:
+                cat = load_garment_metadata(g).get("category", "")
+                if catalog_is_lower(cat):
+                    lower_garments.append(g)
+                else:
+                    upper_garments.append(g)
+            except Exception:
+                upper_garments.append(g)
 
         with tab_catalog:
-            upper_garments = []
-            lower_garments = []
-            for g in garments:
-                try:
-                    cat = load_garment_metadata(g).get("category", "").lower()
-                    if "lower" in cat or "pant" in cat:
-                        lower_garments.append(g)
-                    else:
-                        upper_garments.append(g)
-                except Exception:
-                    upper_garments.append(g)
-
             catalog_category = st.radio("Clothing Category", ["Uppers", "Lowers"], horizontal=True)
+            if catalog_category == "Lowers":
+                st.caption(
+                    "Pants/jeans use **instant local placement** on your legs (full-body photo required). "
+                    "For AI-enhanced legs, add a Colab GPU link under Cloud Worker Settings."
+                )
             display_garments = lower_garments if catalog_category == "Lowers" else upper_garments
 
             if not display_garments:
-                st.warning(f"No {catalog_category.lower()} available in the catalog.")
-                st.stop()
+                st.warning(
+                    f"No {catalog_category.lower()} in the catalog yet. "
+                    "Switch to **Upload Custom** to try pants, jeans, or cargos from your own image."
+                )
+            else:
+                selected_garment = st.selectbox("Choose garment:", display_garments, key="tryon_garment_select")
 
-            selected_garment = st.selectbox("Choose garment:", display_garments, key="tryon_garment_select")
+                try:
+                    metadata   = load_garment_metadata(selected_garment)
+                    size_chart = metadata.get("size_chart", {})
+                except FileNotFoundError:
+                    st.error(f"Garment not found: {selected_garment}")
+                    st.stop()
 
-            try:
-                metadata   = load_garment_metadata(selected_garment)
-                size_chart = metadata.get("size_chart", {})
-            except FileNotFoundError:
-                st.error(f"Garment not found: {selected_garment}")
-                st.stop()
+                try:
+                    catalog_garment_img = load_garment_image(selected_garment)
+                    st.image(bgr_to_pil(catalog_garment_img), width=220, caption=metadata.get("name", selected_garment))
+                except Exception:
+                    st.caption("(Preview unavailable)")
 
-            # Garment thumbnail
-            try:
-                catalog_garment_img = load_garment_image(selected_garment)
-                st.image(bgr_to_pil(catalog_garment_img), width=220, caption=metadata.get("name", selected_garment))
-            except Exception:
-                st.caption("(Preview unavailable)")
-
-            # Garment details
-            with st.expander("📋 Garment Details", expanded=False):
-                st.write(f"**Name:** {metadata.get('name', 'N/A')}")
-                st.write(f"**Brand:** {metadata.get('brand', 'N/A')}")
-                st.write(f"**Category:** {metadata.get('category', 'N/A')}")
-                st.write(f"**Material:** {metadata.get('material', 'N/A')}")
-                st.write(f"**Price:** ${metadata.get('price_usd', 0):.2f}")
-                colors = metadata.get("available_colors", [])
-                if colors:
-                    st.write(f"**Colors:** {', '.join(colors)}")
+                with st.expander("📋 Garment Details", expanded=False):
+                    st.write(f"**Name:** {metadata.get('name', 'N/A')}")
+                    st.write(f"**Brand:** {metadata.get('brand', 'N/A')}")
+                    st.write(f"**Category:** {metadata.get('category', 'N/A')}")
+                    st.write(f"**Material:** {metadata.get('material', 'N/A')}")
+                    st.write(f"**Price:** ${metadata.get('price_usd', 0):.2f}")
+                    colors = metadata.get("available_colors", [])
+                    if colors:
+                        st.write(f"**Colors:** {', '.join(colors)}")
                     
         with tab_custom:
             custom_upload = st.file_uploader("Upload clothing image", type=["jpg", "jpeg", "png"])
-            custom_category = st.selectbox("Clothing Type", ["Upper body", "Lower body", "Dress"])
+            body_region = st.selectbox("Body region", ["Upper body", "Lower body", "Dress"])
+            if body_region == "Lower body":
+                custom_category = st.selectbox(
+                    "Lower body style",
+                    ["Jeans", "Cargo pants", "Chinos", "Dress pants", "Shorts", "Joggers"],
+                    help="Used by the AI try-on model to target legs and waist.",
+                )
+            elif body_region == "Upper body":
+                custom_category = st.selectbox(
+                    "Upper body style",
+                    ["T-shirt", "Shirt", "Jacket", "Hoodie"],
+                )
+            else:
+                custom_category = "Dress"
             if custom_upload:
                 file_bytes = np.asarray(bytearray(custom_upload.read()), dtype=np.uint8)
                 custom_garment_img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
                 st.image(bgr_to_pil(custom_garment_img), width=220, caption="Custom Upload")
-                # Override catalog selection if a file is uploaded in this tab
                 is_custom = True
+                size_chart = {}
 
 
         # Size recommendation
@@ -746,12 +774,16 @@ elif page == "Try-On":
                 size_chart_data = []
                 for size in sorted(size_chart.keys()):
                     m = size_chart[size]
-                    size_chart_data.append({
-                        "Size":          size,
-                        "Shoulder (cm)": m.get("shoulder_width_cm", "N/A"),
-                        "Chest (cm)":    m.get("chest_circumference_cm", "N/A"),
-                        "Torso (cm)":    m.get("torso_length_cm", "N/A"),
-                    })
+                    row = {"Size": size}
+                    if "waist_circumference_cm" in m or "hip_circumference_cm" in m:
+                        row["Waist (cm)"] = m.get("waist_circumference_cm", "N/A")
+                        row["Hip (cm)"] = m.get("hip_circumference_cm", "N/A")
+                        row["Inseam (cm)"] = m.get("inseam_length_cm", "N/A")
+                    else:
+                        row["Shoulder (cm)"] = m.get("shoulder_width_cm", "N/A")
+                        row["Chest (cm)"] = m.get("chest_circumference_cm", "N/A")
+                        row["Torso (cm)"] = m.get("torso_length_cm", "N/A")
+                    size_chart_data.append(row)
                 st.dataframe(size_chart_data, use_container_width=True)
 
         # Cloud API settings
@@ -779,18 +811,22 @@ elif page == "Try-On":
                 st.error("❌ You must upload a photo on the **Upload & Measure** page before you can visually try on a garment!")
             elif is_custom and custom_garment_img is None:
                 st.error("❌ Please upload a custom garment first!")
+            elif not is_custom and not display_garments:
+                st.error(f"❌ No {catalog_category.lower()} in the catalog. Pick another category or use **Upload Custom**.")
             else:
-                with st.spinner("Warping garment to your body shape…"):
+                with st.spinner("Placing garment on your photo…"):
                     try:
                         person_img  = load_image(temp_path)
                         
                         if is_custom:
                             garment_img = custom_garment_img
                             category = custom_category
+                            garment_name = custom_category
                             garment_mask_img = None
                         else:
                             garment_img = load_garment_image(selected_garment)
-                            category    = metadata.get("category", "Upper body").lower()
+                            category = metadata.get("category", "tshirt")
+                            garment_name = metadata.get("name", "")
                             try:
                                 from ml_ai.core.garment_manager import load_garment_mask
                                 garment_mask_img = load_garment_mask(selected_garment)
@@ -802,11 +838,12 @@ elif page == "Try-On":
                             person_image=person_img,
                             garment_image=garment_img,
                             garment_category=category,
+                            garment_name=custom_category if is_custom else garment_name,
                             blend_alpha=blend_alpha,
                             shoulder_scale=shoulder_scale,
                             use_segmentation_mask=True,
                             garment_mask=garment_mask_img,
-                            use_ai_refinement=True,
+                            use_ai_refinement=False,
                             api_url=colab_api_url,
                         )
 
