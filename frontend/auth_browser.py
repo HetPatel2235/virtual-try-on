@@ -46,15 +46,17 @@ def bootstrap_auth_from_browser(
     # 1. First execution returns 0 while JS evaluates
     token = st_javascript(f"sessionStorage.getItem('{AUTH_COOKIE_NAME}')")
     
-    # 2. If it's exactly 0, we must stop and wait for the rerun
+    # 2. If it's exactly 0, it means JS is still evaluating in the browser.
+    # We MUST NOT call st.stop() here, otherwise the iframe never renders and we deadlock.
     if token == 0:
-        st.stop()
+        return # Allow the script to continue so the iframe can mount
 
     # 3. Once evaluated, if token exists, log the user in
     if isinstance(token, str) and token and token != "null":
         user = validate_persistent_token(token)
         if user:
             login_session(session_state, user, existing_token=token)
+            st.rerun() # Force a rerun now that we have logged them in
         else:
             clear_auth_cookie()
 

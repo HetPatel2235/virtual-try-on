@@ -51,124 +51,515 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-def inject_interactive_background():
+def get_css(theme='dark'):
+    if theme == 'dark':
+        text_primary = "#F8FAFC"
+        text_secondary = "#E2E8F0"
+        text_muted = "#94A3B8"
+        bg_main = "transparent"
+        bg_sidebar = "rgba(15, 23, 42, 0.4)"
+        border_color = "rgba(255, 255, 255, 0.05)"
+        border_light = "rgba(255, 255, 255, 0.1)"
+        expander_bg = "rgba(30, 41, 59, 0.3)"
+        expander_summary_bg = "rgba(15, 23, 42, 0.5)"
+        input_bg = "rgba(15, 23, 42, 0.4)"
+        dropzone_bg = "rgba(15, 23, 42, 0.3)"
+        dropzone_border = "rgba(148, 163, 184, 0.4)"
+        dropzone_hover_bg = "rgba(30, 41, 59, 0.5)"
+        dropzone_text = "#CBD5E1"
+        download_btn_bg = "rgba(30, 41, 59, 0.5)"
+        download_btn_hover = "rgba(30, 41, 59, 0.8)"
+        box_shadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+        title_gradient = "linear-gradient(135deg, #A78BFA 0%, #38BDF8 100%)"
+    else:
+        text_primary = "#0F172A"
+        text_secondary = "#1E293B"
+        text_muted = "#475569"
+        bg_main = "transparent"
+        bg_sidebar = "rgba(255, 255, 255, 0.65)"
+        border_color = "rgba(0, 0, 0, 0.06)"
+        border_light = "rgba(0, 0, 0, 0.1)"
+        expander_bg = "rgba(255, 255, 255, 0.5)"
+        expander_summary_bg = "rgba(241, 245, 249, 0.6)"
+        input_bg = "rgba(255, 255, 255, 0.7)"
+        dropzone_bg = "rgba(255, 255, 255, 0.5)"
+        dropzone_border = "rgba(100, 116, 139, 0.4)"
+        dropzone_hover_bg = "rgba(241, 245, 249, 0.8)"
+        dropzone_text = "#475569"
+        download_btn_bg = "rgba(255, 255, 255, 0.7)"
+        download_btn_hover = "rgba(255, 255, 255, 0.9)"
+        box_shadow = "0 8px 32px 0 rgba(31, 38, 135, 0.05)"
+        title_gradient = "linear-gradient(135deg, #7C3AED 0%, #0284C7 100%)"
+
+    return f"""
+    <style>
+    /* -------------------------------------------------------------------------
+       GOOGLE FONTS INJECTION
+       ------------------------------------------------------------------------- */
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+    /* -------------------------------------------------------------------------
+       GLOBAL RESET & TYPOGRAPHY
+       ------------------------------------------------------------------------- */
+    html, body, [class*="css"]  {{
+        font-family: 'Outfit', sans-serif;
+    }}
+    
+    h1, h2, h3, h4, h5, h6, p, span, div, label, input, button {{
+        font-family: 'Outfit', sans-serif;
+    }}
+    
+    .material-icons, .material-symbols-rounded, [data-testid="stIconMaterial"] {{
+        font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       TRANSPARENCY & GLASSMORPHISM BASE
+       ------------------------------------------------------------------------- */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {{
+        background-color: {bg_main} !important;
+        color: {text_secondary} !important;
+    }}
+    
+    header[data-testid="stHeader"] {{
+        background: transparent !important;
+        box-shadow: none !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       MAIN CONTENT CONTAINER
+       ------------------------------------------------------------------------- */
+    .main .block-container {{
+        padding: 2rem 3rem !important;
+        max-width: 1400px;
+    }}
+
+    /* -------------------------------------------------------------------------
+       SIDEBAR GLASSMORPHISM
+       ------------------------------------------------------------------------- */
+    [data-testid="stSidebar"] {{
+        background: {bg_sidebar} !important;
+        backdrop-filter: blur(24px) saturate(150%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
+        border-right: 1px solid {border_color};
+    }}
+    
+    [data-testid="stSidebarNav"] {{
+        background: transparent !important;
+    }}
+    
+    [data-testid="stSidebar"] hr {{
+        border-color: {border_light} !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       TYPOGRAPHY CLASSES
+       ------------------------------------------------------------------------- */
+    .title {{ 
+        font-size: 3.5rem; 
+        font-weight: 700; 
+        letter-spacing: -1px;
+        background: {title_gradient};
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem; 
+    }}
+    .subtitle {{ 
+        font-size: 1.25rem; 
+        color: {text_muted}; 
+        font-weight: 300;
+        margin-bottom: 2.5rem; 
+    }}
+
+    h1, h2, h3, h4, h5, h6 {{
+        color: {text_primary} !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       BUTTONS
+       ------------------------------------------------------------------------- */
+    @keyframes click-pulse {{
+        0% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }}
+        70% {{ box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }}
+    }}
+
+    .stButton > button {{
+        background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 0.5rem 1.5rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.5px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39) !important;
+        min-height: 45px !important;
+    }}
+
+    .stButton > button:hover {{
+        transform: translateY(-3px) scale(1.02) !important;
+        box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important;
+        background: linear-gradient(135deg, #9C71F6 0%, #4D8DF6 100%) !important;
+        color: white !important;
+    }}
+
+    .stButton > button:active {{
+        transform: translateY(2px) scale(0.95) !important;
+        box-shadow: 0 2px 10px rgba(139, 92, 246, 0.4) !important;
+        animation: click-pulse 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        filter: brightness(1.2);
+    }}
+
+    /* Secondary Buttons (Outlined) */
+    .stDownloadButton > button {{
+        background: {download_btn_bg} !important;
+        border: 1px solid {border_light} !important;
+        backdrop-filter: blur(10px) !important;
+        box-shadow: none !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        color: {text_primary} !important;
+    }}
+    
+    .stDownloadButton > button:hover {{
+        background: {download_btn_hover} !important;
+        border: 1px solid rgba(139, 92, 246, 0.5) !important;
+        box-shadow: 0 0 15px rgba(139, 92, 246, 0.3) !important;
+        transform: translateY(-2px) scale(1.01) !important;
+    }}
+    
+    .stDownloadButton > button:active {{
+        transform: translateY(1px) scale(0.97) !important;
+        background: rgba(139, 92, 246, 0.2) !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       FILE UPLOADER (DROP ZONE)
+       ------------------------------------------------------------------------- */
+    [data-testid="stFileUploadDropzone"] {{
+        background: {dropzone_bg} !important;
+        border: 1px dashed {dropzone_border} !important;
+        border-radius: 16px !important;
+        backdrop-filter: blur(10px) !important;
+        transition: all 0.3s ease !important;
+        padding: 2rem !important;
+    }}
+    
+    [data-testid="stFileUploadDropzone"]:hover {{
+        background: {dropzone_hover_bg} !important;
+        border: 1px dashed #8B5CF6 !important;
+        box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.1) !important;
+    }}
+
+    [data-testid="stFileUploadDropzone"] * {{
+        color: {dropzone_text} !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       INPUT FIELDS
+       ------------------------------------------------------------------------- */
+    .stTextInput > div > div > input {{
+        background: {input_bg} !important;
+        border: 1px solid {border_light} !important;
+        color: {text_primary} !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        backdrop-filter: blur(10px) !important;
+        transition: all 0.2s ease !important;
+    }}
+    
+    .stTextInput > div > div > input:focus {{
+        border-color: #8B5CF6 !important;
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2) !important;
+    }}
+
+    /* -------------------------------------------------------------------------
+       CARDS AND EXPANDERS
+       ------------------------------------------------------------------------- */
+    [data-testid="stExpander"] {{
+        background: {expander_bg} !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 12px !important;
+        backdrop-filter: blur(12px) !important;
+        overflow: hidden !important;
+        box-shadow: {box_shadow} !important;
+    }}
+    
+    [data-testid="stExpander"] summary {{
+        background: {expander_summary_bg} !important;
+        padding: 1rem !important;
+        border-bottom: 1px solid {border_color} !important;
+        color: {text_primary} !important;
+    }}
+    
+    /* -------------------------------------------------------------------------
+       METRICS & INFO BOXES
+       ------------------------------------------------------------------------- */
+    .measurement-box {{ 
+        background: {expander_bg};
+        border: 1px solid {border_color};
+        backdrop-filter: blur(10px);
+        padding: 1.5rem; 
+        border-radius: 12px; 
+        margin: 1rem 0; 
+        box-shadow: {box_shadow};
+        color: {text_secondary};
+    }}
+    
+    .success-box {{ 
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #34D399;
+        padding: 1rem; 
+        border-radius: 8px; 
+        margin: 1rem 0; 
+        backdrop-filter: blur(8px);
+    }}
+    
+    .warning-box {{ 
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #FBBF24;
+        padding: 1rem; 
+        border-radius: 8px; 
+        margin: 1rem 0; 
+        backdrop-filter: blur(8px);
+    }}
+    
+    .error-box {{ 
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #F87171;
+        padding: 1rem; 
+        border-radius: 8px; 
+        margin: 1rem 0; 
+        backdrop-filter: blur(8px);
+    }}
+
+    /* -------------------------------------------------------------------------
+       RADIO BUTTONS & TABS
+       ------------------------------------------------------------------------- */
+    div[role="radiogroup"] > label {{
+        background: {expander_summary_bg} !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        border: 1px solid {border_color} !important;
+        color: {text_secondary} !important;
+    }}
+    
+    [data-baseweb="tab-list"] {{
+        background: {expander_summary_bg} !important;
+        padding: 0.5rem !important;
+        border-radius: 12px !important;
+        border: 1px solid {border_color} !important;
+    }}
+
+    [data-baseweb="tab"] {{
+        color: {text_secondary} !important;
+    }}
+
+    [aria-selected="true"] {{
+        background: {bg_sidebar} !important;
+        border-radius: 8px !important;
+        color: {text_primary} !important;
+    }}
+    
+    /* -------------------------------------------------------------------------
+       IMAGE CONTAINERS
+       ------------------------------------------------------------------------- */
+    [data-testid="stImage"] {{
+        border-radius: 16px !important;
+        overflow: hidden !important;
+        box-shadow: {box_shadow} !important;
+        border: 1px solid {border_color} !important;
+        transition: transform 0.3s ease !important;
+    }}
+    
+    [data-testid="stImage"]:hover {{
+        transform: scale(1.02) !important;
+    }}
+    
+    /* Ensure the toggle switches are clearly visible */
+    [data-testid="stWidgetLabel"] {{
+        color: {text_primary} !important;
+    }}
+    
+    [data-testid="stTabs"] button {{
+        background: transparent !important;
+        border: none !important;
+        color: {text_muted} !important;
+        font-weight: 500 !important;
+        padding: 0.5rem 1rem !important;
+        transition: color 0.2s ease !important;
+    }}
+    
+    [data-testid="stTabs"] button[aria-selected="true"] {{
+        color: {text_primary} !important;
+        border-bottom-color: #8B5CF6 !important;
+    }}
+    
+    [data-testid="stTabs"] button:hover {{
+        color: {text_secondary} !important;
+    }}
+    </style>
+    """
+
+def inject_interactive_background(theme='dark'):
     import streamlit.components.v1 as components
-    js_code = """
+    
+    if theme == 'dark':
+        bg_gradient = "linear-gradient(to bottom right, #0B0E14, #1A1C29)"
+        colors_js = """
+        const colors = [
+            {r: 139, g: 92, b: 246, a: 0.4}, // Purple
+            {r: 56, g: 189, b: 248, a: 0.4}, // Light Blue
+            {r: 236, g: 72, b: 153, a: 0.3}, // Pink
+            {r: 45, g: 212, b: 191, a: 0.3}  // Teal
+        ];
+        """
+        mouse_orb_color = "{r: 99, g: 102, b: 241, a: 0.3}"
+        composite_op = "screen"
+    else:
+        bg_gradient = "linear-gradient(to bottom right, #F8FAFC, #FFFFFF)"
+        colors_js = """
+        const colors = [
+            {r: 255, g: 183, b: 178, a: 0.4}, // Soft Peach
+            {r: 178, g: 223, b: 255, a: 0.4}, // Sky Blue
+            {r: 178, g: 255, b: 216, a: 0.4}, // Mint Green
+            {r: 221, b: 255, g: 178, a: 0.4}, // Lavender / Pinkish
+            {r: 253, g: 216, b: 187, a: 0.4}  // Light Orange
+        ];
+        """
+        mouse_orb_color = "{r: 139, g: 92, b: 246, a: 0.2}"
+        composite_op = "multiply"
+        
+    js_code = f"""
     <script>
     const parentDoc = window.parent.document;
-    if (!parentDoc.getElementById("particle-bg")) {
-        const canvas = parentDoc.createElement("canvas");
-        canvas.id = "particle-bg";
-        canvas.style.position = "fixed";
-        canvas.style.top = "0";
-        canvas.style.left = "0";
-        canvas.style.width = "100vw";
-        canvas.style.height = "100vh";
-        canvas.style.zIndex = "-1";
-        canvas.style.pointerEvents = "none";
-        parentDoc.body.prepend(canvas);
+    
+    // Remove old backgrounds if theme changed
+    const oldBg = parentDoc.getElementById("base-bg");
+    const oldCanvas = parentDoc.getElementById("orb-bg");
+    if (oldBg) oldBg.remove();
+    if (oldCanvas) oldCanvas.remove();
 
-        const ctx = canvas.getContext("2d");
-        let width = canvas.width = parentDoc.documentElement.clientWidth;
-        let height = canvas.height = parentDoc.documentElement.clientHeight;
+    // Create base gradient background
+    const bgLayer = parentDoc.createElement("div");
+    bgLayer.id = "base-bg";
+    bgLayer.style.position = "fixed";
+    bgLayer.style.top = "0";
+    bgLayer.style.left = "0";
+    bgLayer.style.width = "100vw";
+    bgLayer.style.height = "100vh";
+    bgLayer.style.zIndex = "-2";
+    bgLayer.style.background = "{bg_gradient}";
+    parentDoc.body.prepend(bgLayer);
 
-        let particles = [];
-        let mouse = { x: width/2, y: height/2 };
+    // Create canvas for ambient glowing orbs
+    const canvas = parentDoc.createElement("canvas");
+    canvas.id = "orb-bg";
+    canvas.style.position = "fixed";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    canvas.style.width = "100vw";
+    canvas.style.height = "100vh";
+    canvas.style.zIndex = "-1";
+    canvas.style.pointerEvents = "none";
+    parentDoc.body.prepend(canvas);
 
-        parentDoc.addEventListener("mousemove", (e) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
+    const ctx = canvas.getContext("2d");
+    let width = canvas.width = parentDoc.documentElement.clientWidth;
+    let height = canvas.height = parentDoc.documentElement.clientHeight;
 
-        parentDoc.defaultView.addEventListener("resize", () => {
-            width = canvas.width = parentDoc.documentElement.clientWidth;
-            height = canvas.height = parentDoc.documentElement.clientHeight;
-        });
+    let orbs = [];
+    let mouse = {{ x: width/2, y: height/2 }};
 
-        class Particle {
-            constructor() {
-                this.x = Math.random() * width;
-                this.y = Math.random() * height;
-                // Base movement: slight horizontal drift, constant upward floating
-                this.base_vx = (Math.random() - 0.5) * 0.5;
-                this.base_vy = - (Math.random() * 1.5 + 0.5); 
-                this.vx = this.base_vx;
-                this.vy = this.base_vy;
-                this.radius = Math.random() * 2.5 + 1.0;
-            }
-            update() {
-                // Antigravity repulsion from mouse
-                let dx = this.x - mouse.x;
-                let dy = this.y - mouse.y;
-                let dist = Math.sqrt(dx*dx + dy*dy);
+    parentDoc.addEventListener("mousemove", (e) => {{
+        mouse.x += (e.clientX - mouse.x) * 0.1;
+        mouse.y += (e.clientY - mouse.y) * 0.1;
+    }});
+
+    parentDoc.defaultView.addEventListener("resize", () => {{
+        width = canvas.width = parentDoc.documentElement.clientWidth;
+        height = canvas.height = parentDoc.documentElement.clientHeight;
+    }});
+
+    {colors_js}
+
+    class Orb {{
+        constructor(isMouseFollower = false) {{
+            this.isMouseFollower = isMouseFollower;
+            this.radius = isMouseFollower ? 400 : (Math.random() * 300 + 200);
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
+            this.vx = (Math.random() - 0.5) * 1.0;
+            this.vy = (Math.random() - 0.5) * 1.0;
+            this.color = isMouseFollower ? {mouse_orb_color} : colors[Math.floor(Math.random() * colors.length)];
+            this.angle = Math.random() * Math.PI * 2;
+            this.wobbleSpeed = Math.random() * 0.02 + 0.01;
+            this.wobbleRadius = Math.random() * 50 + 20;
+            this.baseX = this.x;
+            this.baseY = this.y;
+        }}
+        update() {{
+            if (this.isMouseFollower) {{
+                this.x += (mouse.x - this.x) * 0.05;
+                this.y += (mouse.y - this.y) * 0.05;
+            }} else {{
+                this.baseX += this.vx;
+                this.baseY += this.vy;
                 
-                if (dist < 150) { // repel radius
-                    let force = (150 - dist) / 150;
-                    this.vx += (dx / dist) * force * 1.5;
-                    this.vy += (dy / dist) * force * 1.5;
-                }
-                
-                // Friction / return to normal floating speed
-                this.vx = this.vx * 0.95 + this.base_vx * 0.05;
-                this.vy = this.vy * 0.95 + this.base_vy * 0.05;
+                this.angle += this.wobbleSpeed;
+                this.x = this.baseX + Math.cos(this.angle) * this.wobbleRadius;
+                this.y = this.baseY + Math.sin(this.angle) * this.wobbleRadius;
 
-                this.x += this.vx;
-                this.y += this.vy;
+                if(this.baseX < -this.radius) {{ this.baseX = -this.radius; this.vx *= -1; }}
+                if(this.baseX > width + this.radius) {{ this.baseX = width + this.radius; this.vx *= -1; }}
+                if(this.baseY < -this.radius) {{ this.baseY = -this.radius; this.vy *= -1; }}
+                if(this.baseY > height + this.radius) {{ this.baseY = height + this.radius; this.vy *= -1; }}
+            }}
+        }}
+        draw() {{
+            const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+            gradient.addColorStop(0, `rgba(${{this.color.r}}, ${{this.color.g}}, ${{this.color.b}}, ${{this.color.a}})`);
+            gradient.addColorStop(0.5, `rgba(${{this.color.r}}, ${{this.color.g}}, ${{this.color.b}}, ${{this.color.a * 0.5}})`);
+            gradient.addColorStop(1, `rgba(${{this.color.r}}, ${{this.color.g}}, ${{this.color.b}}, 0)`);
+            
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }}
+    }}
 
-                // Wrap around edges seamlessly
-                if(this.x < -10) this.x = width + 10;
-                if(this.x > width + 10) this.x = -10;
-                if(this.y < -10) {
-                    this.y = height + 10;
-                    this.x = Math.random() * width; // random x when resetting
-                }
-                if(this.y > height + 10) this.y = -10;
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(31, 119, 180, 0.6)"; 
-                ctx.fill();
-            }
-        }
+    for(let i=0; i<5; i++) orbs.push(new Orb(false));
+    orbs.push(new Orb(true));
 
-        // Create particles
-        for(let i=0; i<120; i++) particles.push(new Particle());
-
-        function animate() {
-            ctx.clearRect(0, 0, width, height);
-            for(let i=0; i<particles.length; i++) {
-                particles[i].update();
-                particles[i].draw();
-            }
-            parentDoc.defaultView.requestAnimationFrame(animate);
-        }
-        animate();
-    }
+    function animate() {{
+        if (window.orbAnimationId) {{
+            parentDoc.defaultView.cancelAnimationFrame(window.orbAnimationId);
+        }}
+        
+        ctx.clearRect(0, 0, width, height);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalCompositeOperation = "{composite_op}";
+        for(let i=0; i<orbs.length; i++) {{
+            orbs[i].update();
+            orbs[i].draw();
+        }}
+        window.orbAnimationId = parentDoc.defaultView.requestAnimationFrame(animate);
+    }}
+    animate();
     </script>
     """
     components.html(js_code, height=0, width=0)
 
-inject_interactive_background()
+if 'theme' not in st.session_state:
+    st.session_state.theme = 'dark'
 
-st.markdown(
-    """
-    <style>
-    /* Make backgrounds transparent to reveal the canvas */
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-    
-    .main { padding: 0rem 1rem; }
-    .title { font-size: 2.5rem; font-weight: bold; color: #1f77b4; margin-bottom: 0.5rem; }
-    .subtitle { font-size: 1.2rem; color: #666; margin-bottom: 2rem; }
-    .measurement-box { background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; }
-    .success-box { background-color: #d4edda; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
-    .error-box { background-color: #f8d7da; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+inject_interactive_background(st.session_state.theme)
+st.markdown(get_css(st.session_state.theme), unsafe_allow_html=True)
+
 
 
 # ============================================================================
@@ -192,8 +583,10 @@ def render_auth_page() -> None:
             success, message, user = authenticate_user(login_id, password)
             if success and user is not None:
                 persist_login(st.session_state, user)
-                st.success("Login successful.")
-                st.rerun()
+                # Removing st.rerun() here! 
+                # st_javascript needs the script to finish rendering to the browser to execute.
+                # If we st.rerun(), the javascript is aborted and never saves to sessionStorage!
+                st.success("Login successful. Initializing...")
             else:
                 st.error(message)
 
@@ -337,6 +730,18 @@ bootstrap_auth_from_browser(st.session_state, _auth_cookies)
 session_valid = is_session_valid(st.session_state)
 
 st.sidebar.markdown("# Virtual Try-On System")
+
+# Theme Toggle
+is_light_mode = st.session_state.theme == 'light'
+if st.sidebar.toggle("💡 Light Mode", value=is_light_mode):
+    if st.session_state.theme != 'light':
+        st.session_state.theme = 'light'
+        st.rerun()
+else:
+    if st.session_state.theme != 'dark':
+        st.session_state.theme = 'dark'
+        st.rerun()
+
 st.sidebar.markdown("---")
 
 if session_valid:
@@ -547,7 +952,7 @@ elif page == "Upload & Measure":
                         st.write(f"- {warning}")
 
                 image = load_image(tmp_path)
-                st.image(bgr_to_pil(image), caption="Uploaded image", use_column_width=True)
+                st.image(bgr_to_pil(image), caption="Uploaded image", use_container_width=True)
 
                 if st.button("Analyze Photo", key="analyze_btn", type="primary"):
                     result = process_user_image(tmp_path, user_height_cm=user_height_cm)
@@ -671,98 +1076,75 @@ elif page == "Try-On":
     with col_left:
         st.subheader("🛍️ Select Garment")
 
-        tab_catalog, tab_custom = st.tabs(["From Catalog", "Upload Custom"])
-        
-        is_custom = False
-        custom_garment_img = None
-        custom_category = "Upper body"
         metadata = {}
         size_chart = {}
         selected_garment = garments[0]
 
-        upper_garments = []
-        lower_garments = []
-        for g in garments:
-            try:
-                cat = load_garment_metadata(g).get("category", "")
-                if catalog_is_lower(cat):
-                    lower_garments.append(g)
-                else:
-                    upper_garments.append(g)
-            except Exception:
-                upper_garments.append(g)
+        selected_garment = st.selectbox("Choose garment:", garments, key="tryon_garment_select")
 
-        with tab_catalog:
-            catalog_category = st.radio("Clothing Category", ["Uppers", "Lowers"], horizontal=True)
-            if catalog_category == "Lowers":
-                st.caption(
-                    "Pants/jeans use **instant local placement** on your legs (full-body photo required). "
-                    "For AI-enhanced legs, add a Colab GPU link under Cloud Worker Settings."
-                )
-            display_garments = lower_garments if catalog_category == "Lowers" else upper_garments
+        try:
+            metadata   = load_garment_metadata(selected_garment)
+            size_chart = metadata.get("size_chart", {})
+        except FileNotFoundError:
+            st.error(f"Garment not found: {selected_garment}")
+            st.stop()
 
-            if not display_garments:
-                st.warning(
-                    f"No {catalog_category.lower()} in the catalog yet. "
-                    "Switch to **Upload Custom** to try pants, jeans, or cargos from your own image."
-                )
-            else:
-                selected_garment = st.selectbox("Choose garment:", display_garments, key="tryon_garment_select")
+        try:
+            catalog_garment_img = load_garment_image(selected_garment)
+            st.image(bgr_to_pil(catalog_garment_img), width=220, caption=metadata.get("name", selected_garment))
+        except Exception:
+            st.caption("(Preview unavailable)")
 
-                try:
-                    metadata   = load_garment_metadata(selected_garment)
-                    size_chart = metadata.get("size_chart", {})
-                except FileNotFoundError:
-                    st.error(f"Garment not found: {selected_garment}")
-                    st.stop()
-
-                try:
-                    catalog_garment_img = load_garment_image(selected_garment)
-                    st.image(bgr_to_pil(catalog_garment_img), width=220, caption=metadata.get("name", selected_garment))
-                except Exception:
-                    st.caption("(Preview unavailable)")
-
-                with st.expander("📋 Garment Details", expanded=False):
-                    st.write(f"**Name:** {metadata.get('name', 'N/A')}")
-                    st.write(f"**Brand:** {metadata.get('brand', 'N/A')}")
-                    st.write(f"**Category:** {metadata.get('category', 'N/A')}")
-                    st.write(f"**Material:** {metadata.get('material', 'N/A')}")
-                    st.write(f"**Price:** ${metadata.get('price_usd', 0):.2f}")
-                    colors = metadata.get("available_colors", [])
-                    if colors:
-                        st.write(f"**Colors:** {', '.join(colors)}")
-                    
-        with tab_custom:
-            custom_upload = st.file_uploader("Upload clothing image", type=["jpg", "jpeg", "png"])
-            body_region = st.selectbox("Body region", ["Upper body", "Lower body", "Dress"])
-            if body_region == "Lower body":
-                custom_category = st.selectbox(
-                    "Lower body style",
-                    ["Jeans", "Cargo pants", "Chinos", "Dress pants", "Shorts", "Joggers"],
-                    help="Used by the AI try-on model to target legs and waist.",
-                )
-            elif body_region == "Upper body":
-                custom_category = st.selectbox(
-                    "Upper body style",
-                    ["T-shirt", "Shirt", "Jacket", "Hoodie"],
-                )
-            else:
-                custom_category = "Dress"
-            if custom_upload:
-                file_bytes = np.asarray(bytearray(custom_upload.read()), dtype=np.uint8)
-                custom_garment_img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
-                st.image(bgr_to_pil(custom_garment_img), width=220, caption="Custom Upload")
-                is_custom = True
-                size_chart = {}
+        with st.expander("📋 Garment Details", expanded=False):
+            st.write(f"**Name:** {metadata.get('name', 'N/A')}")
+            st.write(f"**Brand:** {metadata.get('brand', 'N/A')}")
+            st.write(f"**Category:** {metadata.get('category', 'N/A')}")
+            st.write(f"**Material:** {metadata.get('material', 'N/A')}")
+            st.write(f"**Price:** ${metadata.get('price_usd', 0):.2f}")
+            colors = metadata.get("available_colors", [])
+            if colors:
+                st.write(f"**Colors:** {', '.join(colors)}")
 
 
         # Size recommendation
         if size_chart:
             recommendation = recommend_size(measurements, size_chart)
-            st.success(
-                f"📏 Recommended Size: **{recommendation.size}** "
-                f"({recommendation.confidence * 100:.0f}% confidence)"
-            )
+            conf_pct = recommendation.confidence * 100
+            
+            # Determine colors based on theme
+            is_light = st.session_state.get('theme', 'dark') == 'light'
+            card_bg = "rgba(255, 255, 255, 0.5)" if is_light else "rgba(30, 41, 59, 0.4)"
+            border_col = "rgba(0, 0, 0, 0.1)" if is_light else "rgba(255, 255, 255, 0.05)"
+            text_main = "#0F172A" if is_light else "#E2E8F0"
+            text_sub = "#64748B" if is_light else "#94A3B8"
+            track_col = "rgba(0,0,0,0.1)" if is_light else "rgba(255,255,255,0.1)"
+            
+            gauge_html = f"""
+            <div style="display: flex; align-items: center; justify-content: center; background: {card_bg}; padding: 2rem; border-radius: 16px; border: 1px solid {border_col}; margin-bottom: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                <div style="flex: 1; text-align: center; border-right: 1px solid {border_col};">
+                    <h2 style="margin: 0; font-size: 4rem; background: linear-gradient(135deg, #A78BFA, #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1;">{recommendation.size}</h2>
+                    <p style="margin: 0; color: {text_sub}; font-size: 1.1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; margin-top: 0.5rem;">Recommended Fit</p>
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 100 50" style="width: 200px; height: 100px; overflow: visible;">
+                        <!-- Background track -->
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="{track_col}" stroke-width="12" stroke-linecap="round"/>
+                        <!-- Foreground progress -->
+                        <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="url(#conf-grad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="{125.66 * (1 - conf_pct/100)}"/>
+                        <defs>
+                            <linearGradient id="conf-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#EF4444"/>
+                                <stop offset="50%" stop-color="#F59E0B"/>
+                                <stop offset="100%" stop-color="#10B981"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div style="margin-top: -15px; font-size: 2rem; font-weight: 700; color: {text_main};">{conf_pct:.0f}%</div>
+                    <div style="font-size: 0.9rem; color: {text_sub}; font-weight: 500; text-transform: uppercase;">Confidence Score</div>
+                </div>
+            </div>
+            """
+            st.markdown(gauge_html, unsafe_allow_html=True)
 
             with st.expander("📊 All Size Fit Scores", expanded=False):
                 for size in sorted(recommendation.fit_scores.keys()):
@@ -809,36 +1191,25 @@ elif page == "Try-On":
         if run_tryon:
             if not has_photo_result:
                 st.error("❌ You must upload a photo on the **Upload & Measure** page before you can visually try on a garment!")
-            elif is_custom and custom_garment_img is None:
-                st.error("❌ Please upload a custom garment first!")
-            elif not is_custom and not display_garments:
-                st.error(f"❌ No {catalog_category.lower()} in the catalog. Pick another category or use **Upload Custom**.")
             else:
                 with st.spinner("Placing garment on your photo…"):
                     try:
                         person_img  = load_image(temp_path)
-                        
-                        if is_custom:
-                            garment_img = custom_garment_img
-                            category = custom_category
-                            garment_name = custom_category
+                        garment_img = load_garment_image(selected_garment)
+                        category = metadata.get("category", "tshirt")
+                        garment_name = metadata.get("name", "")
+                        try:
+                            from ml_ai.core.garment_manager import load_garment_mask
+                            garment_mask_img = load_garment_mask(selected_garment)
+                        except FileNotFoundError:
                             garment_mask_img = None
-                        else:
-                            garment_img = load_garment_image(selected_garment)
-                            category = metadata.get("category", "tshirt")
-                            garment_name = metadata.get("name", "")
-                            try:
-                                from ml_ai.core.garment_manager import load_garment_mask
-                                garment_mask_img = load_garment_mask(selected_garment)
-                            except FileNotFoundError:
-                                garment_mask_img = None
 
                         engine       = get_tryon_engine_v8()
                         tryon_result = engine.run(
                             person_image=person_img,
                             garment_image=garment_img,
                             garment_category=category,
-                            garment_name=custom_category if is_custom else garment_name,
+                            garment_name=garment_name,
                             blend_alpha=blend_alpha,
                             shoulder_scale=shoulder_scale,
                             use_segmentation_mask=True,
@@ -874,13 +1245,13 @@ elif page == "Try-On":
         if tryon_data is None:
             try:
                 person_img = load_image(temp_path)
-                st.image(bgr_to_pil(person_img), caption="Your photo — press '✨ Try It On'", use_column_width=True)
+                st.image(bgr_to_pil(person_img), caption="Your photo — press '✨ Try It On'", use_container_width=True)
             except Exception:
                 st.info("Press **✨ Try It On** to see the result here.")
 
         elif tryon_data.get("success"):
             composite_bytes = tryon_data["composite_bytes"]
-            st.image(composite_bytes, caption=f"Wearing: {metadata.get('name', selected_garment)}", use_column_width=True)
+            st.image(composite_bytes, caption=f"Wearing: {metadata.get('name', selected_garment)}", use_container_width=True)
 
             proc_time = tryon_data.get("processing_time_s", 0)
             warnings  = tryon_data.get("warnings", [])
@@ -938,15 +1309,15 @@ elif page == "Try-On":
                     if wg_path.exists():
                         with d1:
                             wg = cv2.imread(str(wg_path), cv2.IMREAD_UNCHANGED)
-                            st.image(bgr_to_pil(wg), caption="Warped Garment", use_column_width=True)
+                            st.image(bgr_to_pil(wg), caption="Warped Garment", use_container_width=True)
                     if wm_path.exists():
                         with d2:
                             wm = cv2.imread(str(wm_path), cv2.IMREAD_GRAYSCALE)
-                            st.image(wm, caption="Warped Mask", use_column_width=True)
+                            st.image(wm, caption="Warped Mask", use_container_width=True)
                     if dc_path.exists():
                         with d3:
                             dc = cv2.imread(str(dc_path))
-                            st.image(bgr_to_pil(dc), caption="Final Composite", use_column_width=True)
+                            st.image(bgr_to_pil(dc), caption="Final Composite", use_container_width=True)
                 else:
                     st.info("Debug images not available yet. Run a try-on first.")
 
@@ -983,7 +1354,7 @@ elif page == "Garments":
                 st.markdown(f"### {metadata.get('name', garment_id)}")
                 try:
                     garment_img = load_garment_image(garment_id)
-                    st.image(bgr_to_pil(garment_img), use_column_width=True,
+                    st.image(bgr_to_pil(garment_img), use_container_width=True,
                              caption=metadata.get("name", garment_id))
                 except Exception:
                     st.info("No image available")
